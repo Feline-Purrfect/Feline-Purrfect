@@ -1,0 +1,55 @@
+# Render Blueprint — New → Blueprint → connect this repo.
+# Replaces: API Gateway + 8 Lambdas (web service) and EventBridge + check-missing-logs (cron job).
+services:
+  - type: web
+    name: feline-purrfect-api
+    runtime: node
+    region: virginia            # closest to your old us-east-1; keep Supabase in us-east-1 too
+    plan: starter               # free instances sleep after 15 min idle — see README before using free for the App Store
+    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_PHOTO_BUCKET
+        value: cat-photos
+      - key: SENTRY_DSN
+        sync: false
+      - key: SENTRY_TRACES_SAMPLE_RATE
+        value: "0.1"
+      - key: CORS_ORIGINS
+        value: ""
+
+  - type: cron
+    name: feline-purrfect-missing-logs
+    runtime: node
+    region: virginia
+    plan: starter
+    schedule: "30 23 * * *"     # 23:30 UTC daily — identical to the old EventBridge rule
+    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    startCommand: npm run job:check-missing-logs
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
