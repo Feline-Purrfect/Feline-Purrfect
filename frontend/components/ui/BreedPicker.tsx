@@ -2,26 +2,25 @@ import { CAT_BREEDS } from '@/constants/catBreeds';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { useState } from 'react';
 import {
-    FlatList,
-    Modal,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  FlatList,
+  Modal,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 
 interface BreedPickerProps {
   value: string | null;
   onChange: (breed: string) => void;
-  detecting?: boolean;
 }
 
-export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
+export function BreedPicker({ value, onChange }: BreedPickerProps) {
   const [modalVisible, setModalVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredBreeds = CAT_BREEDS.filter(breed =>
-    breed.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredBreeds = CAT_BREEDS.filter((breed) =>
+    breed.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const selectBreed = (breed: string) => {
@@ -34,19 +33,12 @@ export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
     <>
       <TouchableOpacity
         onPress={() => setModalVisible(true)}
-        disabled={detecting}
-        className={`bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex-row items-center justify-between ${
-          detecting ? 'opacity-50' : ''
-        }`}
+        className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 flex-row items-center justify-between"
       >
         <Text className={value ? 'text-gray-800' : 'text-gray-400'}>
-          {detecting ? 'Detecting breed...' : value || 'Select breed'}
+          {value || 'Select breed'}
         </Text>
-        <FontAwesome6 
-          name={detecting ? 'spinner' : 'chevron-down'} 
-          size={16} 
-          color="#9ca3af"
-        />
+        <FontAwesome6 name="chevron-down" size={16} color="#9ca3af" />
       </TouchableOpacity>
 
       <Modal
@@ -70,7 +62,11 @@ export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
 
               {/* Search */}
               <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3">
-                <FontAwesome6 name="magnifying-glass" size={16} color="#9ca3af" />
+                <FontAwesome6
+                  name="magnifying-glass"
+                  size={16}
+                  color="#9ca3af"
+                />
                 <TextInput
                   value={searchQuery}
                   onChangeText={setSearchQuery}
@@ -81,7 +77,11 @@ export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
                 />
                 {searchQuery.length > 0 && (
                   <TouchableOpacity onPress={() => setSearchQuery('')}>
-                    <FontAwesome6 name="xmark-circle" size={16} color="#9ca3af" />
+                    <FontAwesome6
+                      name="xmark-circle"
+                      size={16}
+                      color="#9ca3af"
+                    />
                   </TouchableOpacity>
                 )}
               </View>
@@ -101,7 +101,9 @@ export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
                   <View className="flex-row items-center justify-between">
                     <Text
                       className={`text-base ${
-                        item === value ? 'text-purple-700 font-semibold' : 'text-gray-900'
+                        item === value
+                          ? 'text-purple-700 font-semibold'
+                          : 'text-gray-900'
                       }`}
                     >
                       {item}
@@ -114,7 +116,11 @@ export function BreedPicker({ value, onChange, detecting }: BreedPickerProps) {
               )}
               ListEmptyComponent={() => (
                 <View className="items-center justify-center py-12">
-                  <FontAwesome6 name="magnifying-glass" size={48} color="#d1d5db" />
+                  <FontAwesome6
+                    name="magnifying-glass"
+                    size={48}
+                    color="#d1d5db"
+                  />
                   <Text className="text-gray-500 mt-4">
                     {`No breeds found matching ${searchQuery}`}
                   </Text>
