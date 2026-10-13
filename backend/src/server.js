@@ -7,7 +7,10 @@ const { createApp } = require('./app');
 
 const app = createApp();
 const server = app.listen(config.port, '0.0.0.0', () => {
-  logger.info({ port: config.port, env: config.env }, 'Feline Purrfect API listening');
+  logger.info(
+    { port: config.port, env: config.env },
+    'Feline Purrfect API listening',
+  );
 });
 
 // Slightly longer than typical load-balancer idle timeouts, so Render never sees a dropped keep-alive.
@@ -39,4 +42,14 @@ process.on('uncaughtException', async (err) => {
   Sentry.captureException(err);
   await Sentry.close(2000).catch(() => {});
   process.exit(1);
+});
+
+app.get('/debug-sentry', function mainHandler(req, res) {
+  // Send a log before throwing the error
+  Sentry.logger.info('User triggered test error', {
+    action: 'test_error_endpoint',
+  });
+  // Send a test metric before throwing the error
+  Sentry.metrics.count('test_counter', 1);
+  throw new Error('My first Sentry error!');
 });

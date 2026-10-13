@@ -12,14 +12,25 @@ router.get('/health', (_req, res) => {
 });
 
 // Readiness: can we actually reach the database? Point your uptime monitor here.
-router.get('/health/ready', async (_req, res) => {
+router.get('/health/ready', async (req, res) => {
   const started = Date.now();
   try {
-    const { error } = await admin.from('diseases').select('disease_id').limit(1);
+    const { error } = await admin
+      .from('diseases')
+      .select('disease_id')
+      .limit(1);
     if (error) throw error;
     res.json({ status: 'ok', database: 'up', latencyMs: Date.now() - started });
   } catch (_err) {
-    res.status(503).json({ status: 'degraded', database: 'down', latencyMs: Date.now() - started });
+    req.log.error(
+      { err: err.message, code: err.code },
+      'Readiness check failed',
+    );
+    res.status(503).json({
+      status: 'degraded',
+      database: 'down',
+      latencyMs: Date.now() - started,
+    });
   }
 });
 

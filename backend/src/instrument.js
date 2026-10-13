@@ -3,7 +3,7 @@
 // Must be the FIRST require in every entry point (server + cron job) so Sentry can
 // patch http/express before they are loaded.
 const Sentry = require('@sentry/node');
-const nodeProfilingIntegration = require('@sentry/profiling-node');
+const { nodeProfilingIntegration } = require('@sentry/profiling-node');
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
