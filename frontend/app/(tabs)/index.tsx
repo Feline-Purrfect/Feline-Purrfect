@@ -2,8 +2,8 @@ import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useCats } from '@/hooks/useCats';
 import { useDashboardAnalytics } from '@/hooks/useDashboard';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { useFocusEffect } from '@react-navigation/native';
 import { router } from 'expo-router';
+import { useFocusEffect } from 'expo-router/react-navigation';
 import { useCallback } from 'react';
 import {
   RefreshControl,
@@ -14,19 +14,32 @@ import {
 } from 'react-native';
 
 export default function HomeScreen() {
-  const { data: cats = [], isLoading: catsLoading, refetch: refetchCats } = useCats();
-  const { data: analytics, isLoading: analyticsLoading, refetch: refetchAnalytics } = useDashboardAnalytics();
+  const {
+    data: cats = [],
+    isLoading: catsLoading,
+    refetch: refetchCats,
+  } = useCats();
+  const {
+    data: analytics,
+    isLoading: analyticsLoading,
+    refetch: refetchAnalytics,
+  } = useDashboardAnalytics();
 
   const isLoading = catsLoading || analyticsLoading;
-  const totalHealthIssues = analytics?.analysis.reduce((sum, cat) => sum + cat.healthIssues.length, 0) || 0;
-  const totalLogs = analytics?.analysis.reduce((sum, cat) => sum + cat.totalLogs, 0) || 0;
+  const totalHealthIssues =
+    analytics?.analysis.reduce(
+      (sum, cat) => sum + cat.healthIssues.length,
+      0,
+    ) || 0;
+  const totalLogs =
+    analytics?.analysis.reduce((sum, cat) => sum + cat.totalLogs, 0) || 0;
 
   // ✅ Auto-refresh when screen comes into focus
   useFocusEffect(
     useCallback(() => {
       refetchCats();
       refetchAnalytics();
-    }, [refetchCats, refetchAnalytics])
+    }, [refetchCats, refetchAnalytics]),
   );
 
   const onRefresh = async () => {
@@ -106,13 +119,19 @@ export default function HomeScreen() {
             <View className="flex-row items-center justify-between">
               <View className="flex-1">
                 <View className="flex-row items-center mb-1">
-                  <FontAwesome6 name="triangle-exclamation" size={18} color="#dc2626" />
+                  <FontAwesome6
+                    name="triangle-exclamation"
+                    size={18}
+                    color="#dc2626"
+                  />
                   <Text className="text-red-700 font-bold text-lg ml-2">
                     Health Alerts
                   </Text>
                 </View>
                 <Text className="text-red-600 text-sm">
-                  {totalHealthIssues} {totalHealthIssues === 1 ? 'issue' : 'issues'} detected across your cats
+                  {totalHealthIssues}{' '}
+                  {totalHealthIssues === 1 ? 'issue' : 'issues'} detected across
+                  your cats
                 </Text>
               </View>
               <FontAwesome6 name="chevron-right" size={20} color="#dc2626" />
@@ -147,15 +166,14 @@ export default function HomeScreen() {
                     {cat.catName}
                   </Text>
                   {cat.breed && (
-                    <Text className="text-purple-600 text-sm">
-                      {cat.breed}
-                    </Text>
+                    <Text className="text-purple-600 text-sm">{cat.breed}</Text>
                   )}
                 </View>
                 {cat.healthIssues.length > 0 && (
                   <View className="bg-red-100 px-3 py-1 rounded-full">
                     <Text className="text-red-700 text-xs font-semibold">
-                      {cat.healthIssues.length} {cat.healthIssues.length === 1 ? 'Alert' : 'Alerts'}
+                      {cat.healthIssues.length}{' '}
+                      {cat.healthIssues.length === 1 ? 'Alert' : 'Alerts'}
                     </Text>
                   </View>
                 )}
@@ -173,7 +191,9 @@ export default function HomeScreen() {
                     </View>
                     {cat.averageWeight && (
                       <View className="flex-1 bg-gray-50 rounded-lg p-2">
-                        <Text className="text-gray-500 text-xs">Avg Weight</Text>
+                        <Text className="text-gray-500 text-xs">
+                          Avg Weight
+                        </Text>
                         <Text className="text-gray-900 font-semibold">
                           {cat.averageWeight} kg
                         </Text>
@@ -205,7 +225,7 @@ export default function HomeScreen() {
           <Text className="text-lg font-bold text-gray-900 mb-4">
             Quick Actions
           </Text>
-          
+
           <TouchableOpacity
             onPress={() => router.push(`/logs`)}
             className="bg-white rounded-2xl p-4 mb-3 border border-gray-200 flex-row items-center"
