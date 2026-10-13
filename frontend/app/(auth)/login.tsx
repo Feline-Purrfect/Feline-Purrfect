@@ -1,8 +1,8 @@
-import { CustomButton } from '@/components/common/CustomButton';
-import { useSignIn } from '@/hooks/useAuth';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { Link, router } from 'expo-router';
-import { useState } from 'react';
+import { CustomButton } from "@/components/common/CustomButton";
+import { useSignIn } from "@/hooks/useAuth";
+import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
+import { Link, router } from "expo-router";
+import { useState } from "react";
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,71 +12,72 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  
+
   const { mutate: signIn, isPending } = useSignIn();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+      Alert.alert("Error", "Please enter both email and password");
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
+      Alert.alert("Error", "Please enter a valid email address");
       return;
     }
 
     try {
-      await signIn({ 
-        email: email.trim().toLowerCase(), 
+      await signIn({
+        email: email.trim().toLowerCase(),
         password,
       });
       // Navigation handled in useAuth hook
     } catch (error: any) {
-      console.error('Login error:', error);
-      
+      console.error("Login error:", error);
+
       // Handle specific Cognito errors
-      if (error.code === 'UserNotConfirmedException') {
+      if (error.code === "UserNotConfirmedException") {
         Alert.alert(
-          'Email Not Verified',
-          'Please verify your email before logging in.',
+          "Email Not Verified",
+          "Please verify your email before logging in.",
           [
-            { text: 'Cancel', style: 'cancel' },
+            { text: "Cancel", style: "cancel" },
             {
-              text: 'Resend Code',
-              onPress: () => router.push({
-                pathname: '/verify-email',
-                params: { email: email.trim().toLowerCase() }
-              })
-            }
-          ]
+              text: "Resend Code",
+              onPress: () =>
+                router.push({
+                  pathname: "/verify-email",
+                  params: { email: email.trim().toLowerCase() },
+                }),
+            },
+          ],
         );
-      } else if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Error', 'Incorrect email or password');
-      } else if (error.code === 'UserNotFoundException') {
-        Alert.alert('Error', 'No account found with this email');
+      } else if (error.code === "NotAuthorizedException") {
+        Alert.alert("Error", "Incorrect email or password");
+      } else if (error.code === "UserNotFoundException") {
+        Alert.alert("Error", "No account found with this email");
       } else {
-        Alert.alert('Error', error.message || 'Failed to sign in');
+        Alert.alert("Error", error.message || "Failed to sign in");
       }
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           className="flex-1"
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
@@ -87,7 +88,9 @@ export default function LoginScreen() {
               <View className="w-20 h-20 bg-primary-100 rounded-full items-center justify-center mb-4">
                 <FontAwesome6 name="cat" size={40} color="#155C8D" />
               </View>
-              <Text className="text-3xl font-bold text-black">Welcome to Feline Purrfect</Text>
+              <Text className="text-3xl font-bold text-black">
+                Welcome to Feline Purrfect
+              </Text>
               <Text className="text-gray mt-2">Sign in to continue</Text>
             </View>
 
@@ -122,27 +125,31 @@ export default function LoginScreen() {
                   autoComplete="password"
                   className="flex-1 ml-3 text-gray-800"
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <FontAwesome6 
-                    name={showPassword ? 'eye' : 'eye-slash'} 
-                    size={16} 
-                    color="#9ca3af" 
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <FontAwesome6
+                    name={showPassword ? "eye" : "eye-slash"}
+                    size={16}
+                    color="#9ca3af"
                   />
                 </TouchableOpacity>
               </View>
             </View>
 
             {/* Forgot Password Link */}
-            <TouchableOpacity 
-              onPress={() => router.push('/forgot-password')}
+            <TouchableOpacity
+              onPress={() => router.push("/forgot-password")}
               className="self-end mb-6"
             >
-              <Text className="text-primary-600 font-semibold">Forgot Password?</Text>
+              <Text className="text-primary-600 font-semibold">
+                Forgot Password?
+              </Text>
             </TouchableOpacity>
 
             {/* Login Button */}
             <CustomButton
-              content={isPending ? 'Signing in...' : 'Sign In'}
+              content={isPending ? "Signing in..." : "Sign In"}
               onPress={handleLogin}
               disabled={isPending}
             />
@@ -152,7 +159,9 @@ export default function LoginScreen() {
               <Text className="text-gray-600">{`Don't have an account? `}</Text>
               <Link href="/signup" asChild>
                 <TouchableOpacity>
-                  <Text className="text-primary-600 font-semibold">Sign Up</Text>
+                  <Text className="text-primary-600 font-semibold">
+                    Sign Up
+                  </Text>
                 </TouchableOpacity>
               </Link>
             </View>

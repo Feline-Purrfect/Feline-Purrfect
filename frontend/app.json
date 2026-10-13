@@ -45,6 +45,14 @@
         {
           "photosPermission": "The app accesses your photo library to let you share the pictures of your cats."
         }
+      ],
+      [
+        "@sentry/react-native/expo",
+        {
+          "url": "https://sentry.io/",
+          "project": "react-native",
+          "organization": "jeonghyeon-lee"
+        }
       ]
     ],
     "experiments": {
