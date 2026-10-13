@@ -27,16 +27,28 @@ export function useSignUp() {
     mutationFn: (data: SignUpRequest) => authApi.signUp(data),
     onError: (error: any) => {
       console.error('Failed to sign up:', error);
-      
+
       // Show user-friendly error alerts
       if (error.code === 'UsernameExistsException') {
-        Alert.alert('Account Exists', 'An account with this email already exists.');
+        Alert.alert(
+          'Account Exists',
+          'An account with this email already exists.',
+        );
       } else if (error.code === 'InvalidPasswordException') {
-        Alert.alert('Invalid Password', 'Password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+        Alert.alert(
+          'Invalid Password',
+          'Password must be at least 8 characters with uppercase, lowercase, number, and special character.',
+        );
       } else if (error.code === 'InvalidParameterException') {
-        Alert.alert('Invalid Input', error.message || 'Please check your information and try again.');
+        Alert.alert(
+          'Invalid Input',
+          error.message || 'Please check your information and try again.',
+        );
       } else {
-        Alert.alert('Sign Up Failed', error.message || 'Unable to create account. Please try again.');
+        Alert.alert(
+          'Sign Up Failed',
+          error.message || 'Unable to create account. Please try again.',
+        );
       }
     },
   });
@@ -49,15 +61,27 @@ export function useConfirmSignUp() {
       authApi.confirmSignUp(email, code),
     onError: (error: any) => {
       console.error('Failed to verify email:', error);
-      
+
       if (error.code === 'CodeMismatchException') {
-        Alert.alert('Invalid Code', 'The verification code you entered is incorrect.');
+        Alert.alert(
+          'Invalid Code',
+          'The verification code you entered is incorrect.',
+        );
       } else if (error.code === 'ExpiredCodeException') {
-        Alert.alert('Code Expired', 'Your verification code has expired. Please request a new one.');
+        Alert.alert(
+          'Code Expired',
+          'Your verification code has expired. Please request a new one.',
+        );
       } else if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Already Verified', 'This account is already verified. Please sign in.');
+        Alert.alert(
+          'Already Verified',
+          'This account is already verified. Please sign in.',
+        );
       } else {
-        Alert.alert('Verification Failed', error.message || 'Unable to verify email. Please try again.');
+        Alert.alert(
+          'Verification Failed',
+          error.message || 'Unable to verify email. Please try again.',
+        );
       }
     },
   });
@@ -68,11 +92,17 @@ export function useResendConfirmationCode() {
   return useMutation({
     mutationFn: (email: string) => authApi.resendConfirmationCode(email),
     onSuccess: () => {
-      Alert.alert('Code Sent', 'A new verification code has been sent to your email.');
+      Alert.alert(
+        'Code Sent',
+        'A new verification code has been sent to your email.',
+      );
     },
     onError: (error: any) => {
       console.error('Failed to resend code:', error);
-      Alert.alert('Failed to Resend', error.message || 'Unable to send verification code. Please try again.');
+      Alert.alert(
+        'Failed to Resend',
+        error.message || 'Unable to send verification code. Please try again.',
+      );
     },
   });
 }
@@ -86,23 +116,46 @@ export function useSignIn() {
     onSuccess: (response) => {
       // Update query cache with user data
       queryClient.setQueryData(AUTH_QUERY_KEY, response.user);
-      
+
       // Navigate to home
       router.replace('/(tabs)');
     },
-    onError: (error: any) => {
+    onError: (error: any, variables: SignInRequest) => {
       console.error('Failed to sign in:', error);
-      
+
       if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Invalid Credentials', 'Incorrect email or password. Please try again.');
+        Alert.alert(
+          'Email Not Verified',
+          "Your account isn't verified yet. We'll send you a new code.",
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Verify Now',
+              onPress: () =>
+                router.push({
+                  pathname: '/verify-email',
+                  params: { email: variables.email, resend: '1' },
+                }),
+            },
+          ],
+        );
       } else if (error.code === 'UserNotConfirmedException') {
-        Alert.alert('Email Not Verified', 'Please verify your email before signing in.');
+        Alert.alert(
+          'Email Not Verified',
+          'Please verify your email before signing in.',
+        );
       } else if (error.code === 'UserNotFoundException') {
         Alert.alert('Account Not Found', 'No account exists with this email.');
       } else if (error.code === 'PasswordResetRequiredException') {
-        Alert.alert('Password Reset Required', 'You need to reset your password before signing in.');
+        Alert.alert(
+          'Password Reset Required',
+          'You need to reset your password before signing in.',
+        );
       } else {
-        Alert.alert('Sign In Failed', error.message || 'Unable to sign in. Please try again.');
+        Alert.alert(
+          'Sign In Failed',
+          error.message || 'Unable to sign in. Please try again.',
+        );
       }
     },
   });
@@ -118,7 +171,7 @@ export function useSignOut() {
       // Clear user from cache
       queryClient.setQueryData(AUTH_QUERY_KEY, null);
       queryClient.clear();
-      
+
       // Navigate to login
       router.replace('/(auth)/login');
     },
@@ -134,17 +187,26 @@ export function useForgotPassword() {
   return useMutation({
     mutationFn: (email: string) => authApi.forgotPassword(email),
     onSuccess: () => {
-      Alert.alert('Code Sent', 'A password reset code has been sent to your email.');
+      Alert.alert(
+        'Code Sent',
+        'A password reset code has been sent to your email.',
+      );
     },
     onError: (error: any) => {
       console.error('Failed to send reset code:', error);
-      
+
       if (error.code === 'UserNotFoundException') {
         Alert.alert('Account Not Found', 'No account exists with this email.');
       } else if (error.code === 'LimitExceededException') {
-        Alert.alert('Too Many Attempts', 'You have exceeded the maximum number of attempts. Please try again later.');
+        Alert.alert(
+          'Too Many Attempts',
+          'You have exceeded the maximum number of attempts. Please try again later.',
+        );
       } else {
-        Alert.alert('Reset Failed', error.message || 'Unable to send reset code. Please try again.');
+        Alert.alert(
+          'Reset Failed',
+          error.message || 'Unable to send reset code. Please try again.',
+        );
       }
     },
   });
@@ -164,15 +226,24 @@ export function useConfirmForgotPassword() {
     }) => authApi.confirmForgotPassword(email, code, newPassword),
     onError: (error: any) => {
       console.error('Failed to reset password:', error);
-      
+
       if (error.code === 'CodeMismatchException') {
         Alert.alert('Invalid Code', 'The reset code you entered is incorrect.');
       } else if (error.code === 'ExpiredCodeException') {
-        Alert.alert('Code Expired', 'Your reset code has expired. Please request a new one.');
+        Alert.alert(
+          'Code Expired',
+          'Your reset code has expired. Please request a new one.',
+        );
       } else if (error.code === 'InvalidPasswordException') {
-        Alert.alert('Invalid Password', 'Password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+        Alert.alert(
+          'Invalid Password',
+          'Password must be at least 8 characters with uppercase, lowercase, number, and special character.',
+        );
       } else {
-        Alert.alert('Reset Failed', error.message || 'Unable to reset password. Please try again.');
+        Alert.alert(
+          'Reset Failed',
+          error.message || 'Unable to reset password. Please try again.',
+        );
       }
     },
   });
@@ -193,15 +264,27 @@ export function useChangePassword() {
     },
     onError: (error: any) => {
       console.error('Failed to change password:', error);
-      
+
       if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Incorrect Password', 'Your current password is incorrect.');
+        Alert.alert(
+          'Incorrect Password',
+          'Your current password is incorrect.',
+        );
       } else if (error.code === 'InvalidPasswordException') {
-        Alert.alert('Invalid Password', 'New password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+        Alert.alert(
+          'Invalid Password',
+          'New password must be at least 8 characters with uppercase, lowercase, number, and special character.',
+        );
       } else if (error.code === 'LimitExceededException') {
-        Alert.alert('Too Many Attempts', 'You have exceeded the maximum number of attempts. Please try again later.');
+        Alert.alert(
+          'Too Many Attempts',
+          'You have exceeded the maximum number of attempts. Please try again later.',
+        );
       } else {
-        Alert.alert('Change Failed', error.message || 'Unable to change password. Please try again.');
+        Alert.alert(
+          'Change Failed',
+          error.message || 'Unable to change password. Please try again.',
+        );
       }
     },
   });
@@ -217,19 +300,28 @@ export function useDeleteAccount() {
       // Clear user from cache
       queryClient.setQueryData(AUTH_QUERY_KEY, null);
       queryClient.clear();
-      
+
       // Navigate to login
       router.replace('/(auth)/login');
-      
-      Alert.alert('Account Deleted', 'Your account has been permanently deleted.');
+
+      Alert.alert(
+        'Account Deleted',
+        'Your account has been permanently deleted.',
+      );
     },
     onError: (error: any) => {
       console.error('Failed to delete account:', error);
-      
+
       if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Session Expired', 'Please sign in again to delete your account.');
+        Alert.alert(
+          'Session Expired',
+          'Please sign in again to delete your account.',
+        );
       } else {
-        Alert.alert('Delete Failed', error.message || 'Unable to delete account. Please try again.');
+        Alert.alert(
+          'Delete Failed',
+          error.message || 'Unable to delete account. Please try again.',
+        );
       }
     },
   });

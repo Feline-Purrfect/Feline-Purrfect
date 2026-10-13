@@ -2,7 +2,7 @@ import { CustomButton } from '@/components/common/CustomButton';
 import { useConfirmSignUp, useResendConfirmationCode } from '@/hooks/useAuth';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -16,11 +16,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function VerifyEmailScreen() {
-  const { email } = useLocalSearchParams<{ email: string }>();
+  const { email, resend } = useLocalSearchParams<{
+    email: string;
+    resend?: string;
+  }>();
   const [code, setCode] = useState<string>('');
-  
-  const { mutate: confirmSignUp, isPending: isConfirmationPending } = useConfirmSignUp();
-  const { mutate: resendConfirmationCode, isPending: isResendPending } = useResendConfirmationCode();
+  const autoResent = useRef(false);
+
+  const { mutate: confirmSignUp, isPending: isConfirmationPending } =
+    useConfirmSignUp();
+  const { mutate: resendConfirmationCode, isPending: isResendPending } =
+    useResendConfirmationCode();
+
+  useEffect(() => {
+    if (resend === '1' && email && !autoResent.current) {
+      autoResent.current = true;
+      resendConfirmationCode(email);
+    }
+  }, [resend, email, resendConfirmationCode]);
 
   const handleVerify = () => {
     if (!code.trim()) {
@@ -44,12 +57,12 @@ export default function VerifyEmailScreen() {
               [
                 {
                   text: 'OK',
-                  onPress: () => router.replace('/login')
-                }
-              ]
+                  onPress: () => router.replace('/login'),
+                },
+              ],
             );
           },
-        }
+        },
       );
     } catch (error: any) {
       console.error('Verification error:', error);
@@ -62,17 +75,20 @@ export default function VerifyEmailScreen() {
       resendConfirmationCode(email || '');
     } catch (error: any) {
       console.error('Resend code error:', error);
-      Alert.alert('Error', error.message || 'Failed to resend verification code');
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to resend verification code',
+      );
     }
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           className="flex-1"
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
@@ -81,18 +97,28 @@ export default function VerifyEmailScreen() {
             {/* Icon */}
             <View className="items-center mb-8">
               <View className="w-20 h-20 bg-primary-100 rounded-full items-center justify-center mb-4">
-                <FontAwesome6 name="envelope-open-text" size={32} color="#155C8D" />
+                <FontAwesome6
+                  name="envelope-open-text"
+                  size={32}
+                  color="#155C8D"
+                />
               </View>
-              <Text className="text-3xl font-bold text-black">Verify Email</Text>
+              <Text className="text-3xl font-bold text-black">
+                Verify Email
+              </Text>
               <Text className="text-gray mt-2 text-center">
                 {`We've sent a 6-digit code to`}
               </Text>
-              <Text className="text-primary-600 font-semibold mt-1">{email}</Text>
+              <Text className="text-primary-600 font-semibold mt-1">
+                {email}
+              </Text>
             </View>
 
             {/* Verification Code Input */}
             <View className="mb-6">
-              <Text className="text-gray-700 font-semibold mb-2">Verification Code</Text>
+              <Text className="text-gray-700 font-semibold mb-2">
+                Verification Code
+              </Text>
               <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                 <FontAwesome6 name="key" size={16} color="#9ca3af" />
                 <TextInput
@@ -116,16 +142,18 @@ export default function VerifyEmailScreen() {
             {/* Resend Code */}
             <View className="items-center mt-6">
               <Text className="text-gray-600 mb-2">{`Didn't receive the code?`}</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleResendCode}
                 disabled={isResendPending}
               >
-                <Text className="text-primary-600 font-semibold">Resend Code</Text>
+                <Text className="text-primary-600 font-semibold">
+                  Resend Code
+                </Text>
               </TouchableOpacity>
             </View>
 
             {/* Back to Login */}
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => router.replace('/login')}
               className="items-center mt-8"
             >

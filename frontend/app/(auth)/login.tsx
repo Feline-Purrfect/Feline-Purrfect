@@ -1,8 +1,8 @@
-import { CustomButton } from "@/components/common/CustomButton";
-import { useSignIn } from "@/hooks/useAuth";
-import FontAwesome6 from "@expo/vector-icons/FontAwesome6";
-import { Link, router } from "expo-router";
-import { useState } from "react";
+import { CustomButton } from '@/components/common/CustomButton';
+import { useSignIn } from '@/hooks/useAuth';
+import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
+import { Link, router } from 'expo-router';
+import { useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -12,69 +12,39 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const { mutate: signIn, isPending } = useSignIn();
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please enter both email and password");
+      Alert.alert('Error', 'Please enter both email and password');
       return;
     }
 
     // Basic email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      Alert.alert("Error", "Please enter a valid email address");
+      Alert.alert('Error', 'Please enter a valid email address');
       return;
     }
 
-    try {
-      await signIn({
-        email: email.trim().toLowerCase(),
-        password,
-      });
-      // Navigation handled in useAuth hook
-    } catch (error: any) {
-      console.error("Login error:", error);
-
-      // Handle specific Cognito errors
-      if (error.code === "UserNotConfirmedException") {
-        Alert.alert(
-          "Email Not Verified",
-          "Please verify your email before logging in.",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Resend Code",
-              onPress: () =>
-                router.push({
-                  pathname: "/verify-email",
-                  params: { email: email.trim().toLowerCase() },
-                }),
-            },
-          ],
-        );
-      } else if (error.code === "NotAuthorizedException") {
-        Alert.alert("Error", "Incorrect email or password");
-      } else if (error.code === "UserNotFoundException") {
-        Alert.alert("Error", "No account found with this email");
-      } else {
-        Alert.alert("Error", error.message || "Failed to sign in");
-      }
-    }
+    signIn({
+      email: email.trim().toLowerCase(),
+      password,
+    });
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
       <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
         <ScrollView
@@ -129,7 +99,7 @@ export default function LoginScreen() {
                   onPress={() => setShowPassword(!showPassword)}
                 >
                   <FontAwesome6
-                    name={showPassword ? "eye" : "eye-slash"}
+                    name={showPassword ? 'eye' : 'eye-slash'}
                     size={16}
                     color="#9ca3af"
                   />
@@ -139,7 +109,7 @@ export default function LoginScreen() {
 
             {/* Forgot Password Link */}
             <TouchableOpacity
-              onPress={() => router.push("/forgot-password")}
+              onPress={() => router.push('/forgot-password')}
               className="self-end mb-6"
             >
               <Text className="text-primary-600 font-semibold">
@@ -149,7 +119,7 @@ export default function LoginScreen() {
 
             {/* Login Button */}
             <CustomButton
-              content={isPending ? "Signing in..." : "Sign In"}
+              content={isPending ? 'Signing in...' : 'Sign In'}
               onPress={handleLogin}
               disabled={isPending}
             />
