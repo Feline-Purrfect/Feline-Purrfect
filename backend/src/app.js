@@ -1,24 +1,22 @@
-'use strict';
+import crypto from 'node:crypto';
+import express from 'express';
+import helmet from 'helmet';
+import cors from 'cors';
+import pinoHttp from 'pino-http';
+import rateLimit from 'express-rate-limit';
+import Sentry from './instrument.js';
 
-const crypto = require('node:crypto');
-const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
-const pinoHttp = require('pino-http');
-const rateLimit = require('express-rate-limit');
-const Sentry = require('./instrument');
+import config from './config.js';
+import logger from './lib/logger.js';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 
-const config = require('./config');
-const logger = require('./lib/logger');
-const { errorHandler, notFoundHandler } = require('./middleware/errorHandler');
-
-const healthRoutes = require('./routes/health');
-const authRoutes = require('./routes/auth');
-const catsRoutes = require('./routes/cats');
-const logsRoutes = require('./routes/logs');
-const diseasesRoutes = require('./routes/diseases');
-const dashboardRoutes = require('./routes/dashboard');
-const devicesRoutes = require('./routes/devices');
+import healthRoutes from './routes/health.js';
+import authRoutes from './routes/auth.js';
+import catsRoutes from './routes/cats.js';
+import logsRoutes from './routes/logs.js';
+import diseasesRoutes from './routes/diseases.js';
+import dashboardRoutes from './routes/dashboard.js';
+import devicesRoutes from './routes/devices.js';
 
 function createApp() {
   const app = express();
@@ -71,6 +69,13 @@ function createApp() {
   app.use('/dashboard', dashboardRoutes);
   app.use('/devices', jsonSmall, devicesRoutes);
 
+  // Sentry smoke test (dev only). Must be registered before the 404 handler or it is unreachable.
+  if (!config.isProd) {
+    app.get('/debug-sentry', () => {
+      throw new Error('Sentry test error from /debug-sentry');
+    });
+  }
+
   app.use(notFoundHandler);
   if (config.sentry.dsn) Sentry.setupExpressErrorHandler(app); // must come before our own error handler
   app.use(errorHandler);
@@ -78,4 +83,4 @@ function createApp() {
   return app;
 }
 
-module.exports = { createApp };
+export { createApp };

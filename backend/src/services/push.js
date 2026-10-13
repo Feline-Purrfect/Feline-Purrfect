@@ -1,8 +1,6 @@
-'use strict';
-
-const { Expo } = require('expo-server-sdk');
-const config = require('../config');
-const logger = require('../lib/logger');
+import { Expo } from 'expo-server-sdk';
+import config from '../config.js';
+import logger from '../lib/logger.js';
 
 const expo = new Expo({ accessToken: config.expoAccessToken });
 
@@ -32,4 +30,4 @@ async function sendPush(messages) {
   return { sent, deadTokens };
 }
 
-module.exports = { sendPush, isValidToken };
+export { sendPush, isValidToken };

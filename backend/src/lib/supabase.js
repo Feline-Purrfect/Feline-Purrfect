@@ -1,7 +1,5 @@
-'use strict';
-
-const { createClient } = require('@supabase/supabase-js');
-const config = require('../config');
+import { createClient } from '@supabase/supabase-js';
+import config from '../config.js';
 
 const baseOptions = {
   auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
@@ -17,4 +15,4 @@ const admin = createClient(config.supabase.url, config.supabase.serviceKey, base
 /** Fresh anon-key client per auth flow so sessions can never leak between requests. */
 const authClient = () => createClient(config.supabase.url, config.supabase.anonKey, baseOptions);
 
-module.exports = { admin, authClient };
+export { admin, authClient };

@@ -1,12 +1,10 @@
-'use strict';
-
-const express = require('express');
-const { z } = require('zod');
-const { admin, authClient } = require('../lib/supabase');
-const { HttpError, parse } = require('../lib/errors');
-const { requireAuth, forgetUser } = require('../middleware/auth');
-const { deletePhotos } = require('../services/storage');
-const logger = require('../lib/logger');
+import express from 'express';
+import { z } from 'zod';
+import { admin, authClient } from '../lib/supabase.js';
+import { HttpError, parse } from '../lib/errors.js';
+import { requireAuth, forgetUser } from '../middleware/auth.js';
+import { deletePhotos } from '../services/storage.js';
+import logger from '../lib/logger.js';
 
 const router = express.Router();
 
@@ -191,4 +189,4 @@ router.delete('/delete-account', requireAuth, async (req, res) => {
   res.json({ message: 'Account deleted successfully' });
 });
 
-module.exports = router;
+export default router;

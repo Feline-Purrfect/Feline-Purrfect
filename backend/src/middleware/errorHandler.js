@@ -1,8 +1,6 @@
-'use strict';
-
-const { ZodError } = require('zod');
-const { HttpError } = require('../lib/errors');
-const logger = require('../lib/logger');
+import { ZodError } from 'zod';
+import { HttpError } from '../lib/errors.js';
+import logger from '../lib/logger.js';
 
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, next) {
@@ -30,4 +28,4 @@ function notFoundHandler(req, res) {
   res.status(404).json({ code: 'NotFound', message: `Endpoint not found: ${req.method} ${req.path}` });
 }
 
-module.exports = { errorHandler, notFoundHandler };
+export { errorHandler, notFoundHandler };

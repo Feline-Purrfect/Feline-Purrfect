@@ -444,4 +444,4 @@ const diseases = [
   }
 ];
 
-module.exports = { diseases };
+export { diseases };

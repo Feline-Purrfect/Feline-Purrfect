@@ -1,16 +1,14 @@
-'use strict';
-
 /**
  * Daily reminder job — replaces the check-missing-logs Lambda + EventBridge rule.
  * Runs as a Render Cron Job at 23:30 UTC (see render.yaml). Finds every cat with no log for
  * today (UTC, same as before), groups by owner, and sends one Expo push per user.
  */
 
-const Sentry = require('../instrument'); // keep first
-const config = require('../config');
-const logger = require('../lib/logger');
-const { admin } = require('../lib/supabase');
-const { sendPush } = require('../services/push');
+import Sentry from '../instrument.js'; // keep first
+import config from '../config.js';
+import logger from '../lib/logger.js';
+import { admin } from '../lib/supabase.js';
+import { sendPush } from '../services/push.js';
 
 const PAGE = 1000;
 const CRON_SCHEDULE = '30 23 * * *';

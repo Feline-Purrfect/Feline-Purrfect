@@ -1,9 +1,7 @@
-'use strict';
-
-const Sentry = require('./instrument'); // keep first
-const config = require('./config');
-const logger = require('./lib/logger');
-const { createApp } = require('./app');
+import Sentry from './instrument.js'; // keep first
+import config from './config.js';
+import logger from './lib/logger.js';
+import { createApp } from './app.js';
 
 const app = createApp();
 const server = app.listen(config.port, '0.0.0.0', () => {
@@ -44,12 +42,3 @@ process.on('uncaughtException', async (err) => {
   process.exit(1);
 });
 
-app.get('/debug-sentry', function mainHandler(req, res) {
-  // Send a log before throwing the error
-  Sentry.logger.info('User triggered test error', {
-    action: 'test_error_endpoint',
-  });
-  // Send a test metric before throwing the error
-  Sentry.metrics.count('test_counter', 1);
-  throw new Error('My first Sentry error!');
-});

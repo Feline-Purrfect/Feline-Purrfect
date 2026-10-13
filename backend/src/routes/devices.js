@@ -1,11 +1,9 @@
-'use strict';
-
-const express = require('express');
-const { z } = require('zod');
-const { admin } = require('../lib/supabase');
-const { HttpError, parse } = require('../lib/errors');
-const { requireAuth } = require('../middleware/auth');
-const { isValidToken } = require('../services/push');
+import express from 'express';
+import { z } from 'zod';
+import { admin } from '../lib/supabase.js';
+import { HttpError, parse } from '../lib/errors.js';
+import { requireAuth } from '../middleware/auth.js';
+import { isValidToken } from '../services/push.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -35,4 +33,4 @@ router.delete('/', async (req, res) => {
   res.json({ message: 'Device unregistered' });
 });
 
-module.exports = router;
+export default router;

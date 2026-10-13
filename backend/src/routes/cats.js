@@ -1,14 +1,12 @@
-'use strict';
-
-const crypto = require('node:crypto');
-const express = require('express');
-const { z } = require('zod');
-const { admin } = require('../lib/supabase');
-const { HttpError, notFound, parse, isUuid } = require('../lib/errors');
-const { toCat } = require('../lib/mappers');
-const { requireAuth } = require('../middleware/auth');
-const { uploadCatPhoto, signPhotoPaths, deletePhotos } = require('../services/storage');
-const logger = require('../lib/logger');
+import crypto from 'node:crypto';
+import express from 'express';
+import { z } from 'zod';
+import { admin } from '../lib/supabase.js';
+import { HttpError, notFound, parse, isUuid } from '../lib/errors.js';
+import { toCat } from '../lib/mappers.js';
+import { requireAuth } from '../middleware/auth.js';
+import { uploadCatPhoto, signPhotoPaths, deletePhotos } from '../services/storage.js';
+import logger from '../lib/logger.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -129,4 +127,4 @@ router.delete('/:id', async (req, res) => {
   res.json({ message: 'Cat deleted successfully' });
 });
 
-module.exports = router;
+export default router;

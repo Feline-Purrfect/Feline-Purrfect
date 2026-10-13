@@ -1,11 +1,9 @@
-'use strict';
-
-const express = require('express');
-const { z } = require('zod');
-const { admin } = require('../lib/supabase');
-const { HttpError, notFound, parse, isUuid } = require('../lib/errors');
-const { toLog } = require('../lib/mappers');
-const { requireAuth } = require('../middleware/auth');
+import express from 'express';
+import { z } from 'zod';
+import { admin } from '../lib/supabase.js';
+import { HttpError, notFound, parse, isUuid } from '../lib/errors.js';
+import { toLog } from '../lib/mappers.js';
+import { requireAuth } from '../middleware/auth.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -140,4 +138,4 @@ router.delete('/:id', async (req, res) => {
   res.json({ message: 'Log deleted successfully' });
 });
 
-module.exports = router;
+export default router;

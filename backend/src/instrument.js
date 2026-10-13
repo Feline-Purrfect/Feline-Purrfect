@@ -1,9 +1,9 @@
-'use strict';
-
-// Must be the FIRST require in every entry point (server + cron job) so Sentry can
-// patch http/express before they are loaded.
-const Sentry = require('@sentry/node');
-const { nodeProfilingIntegration } = require('@sentry/profiling-node');
+// Sentry must initialise before express/http are loaded. In ESM, static imports are hoisted and
+// evaluated before any code in the importing file runs, so "import it first" is NOT enough on its own.
+// The npm scripts preload this file with `node --import ./src/instrument.js ...` (Sentry's documented
+// ESM setup). Entry points also import it as a fallback; ESM caches by URL, so it only runs once.
+import * as Sentry from '@sentry/node';
+import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 if (process.env.SENTRY_DSN) {
   Sentry.init({
@@ -18,4 +18,4 @@ if (process.env.SENTRY_DSN) {
   });
 }
 
-module.exports = Sentry;
+export default Sentry;

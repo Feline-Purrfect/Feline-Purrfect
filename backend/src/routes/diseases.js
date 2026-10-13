@@ -1,9 +1,7 @@
-'use strict';
-
-const express = require('express');
-const { admin } = require('../lib/supabase');
-const { notFound, isUuid } = require('../lib/errors');
-const { toDisease } = require('../lib/mappers');
+import express from 'express';
+import { admin } from '../lib/supabase.js';
+import { notFound, isUuid } from '../lib/errors.js';
+import { toDisease } from '../lib/mappers.js';
 
 const router = express.Router();
 
@@ -47,4 +45,4 @@ router.get('/:id', async (req, res) => {
   res.json({ disease: toDisease(data) });
 });
 
-module.exports = router;
+export default router;

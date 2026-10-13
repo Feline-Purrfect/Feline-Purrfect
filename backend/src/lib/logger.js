@@ -1,10 +1,8 @@
-'use strict';
-
-const pino = require('pino');
-const config = require('../config');
+import pino from 'pino';
+import config from '../config.js';
 
 // JSON to stdout. Render captures it; pipe to `npx pino-pretty` locally if you want it readable.
-module.exports = pino({
+export default pino({
   level: config.logLevel,
   redact: {
     paths: [

@@ -1,13 +1,11 @@
-'use strict';
-
 // One-off / repeatable: loads data/diseaseData.js (your original seed data) into Postgres.
 // Safe to re-run — rows are upserted by name, so nothing duplicates (the old Lambda created
 // fresh UUIDs and duplicated everything on each call).
 //
 //   npm run seed:diseases          (reads .env; or set SUPABASE_* in your shell)
 
-const { admin } = require('../src/lib/supabase');
-const { diseases } = require('../data/diseaseData');
+import { admin } from '../src/lib/supabase.js';
+import { diseases } from '../data/diseaseData.js';
 
 async function main() {
   const rows = diseases.map((d) => ({

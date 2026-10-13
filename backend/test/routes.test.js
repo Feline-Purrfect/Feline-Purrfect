@@ -1,13 +1,12 @@
-'use strict';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { db, authResponses, load, call, USER_A, USER_B } from './helpers.js';
+import { errorHandler } from '../src/middleware/errorHandler.js';
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { db, authResponses, load, call, USER_A, USER_B } = require('./helpers');
-
-const cats = load('cats.js');
-const logs = load('logs.js');
-const auth = load('auth.js');
-const dashboard = load('dashboard.js');
+const cats = await load('cats.js');
+const logs = await load('logs.js');
+const auth = await load('auth.js');
+const dashboard = await load('dashboard.js');
 
 const userB = { id: USER_B, email: 'b@example.com', name: 'B', metadata: {} };
 
@@ -217,7 +216,6 @@ test('auth/refresh: returns a new session', async () => {
 });
 
 test('unexpected errors become a clean 500 with no internals leaked', async () => {
-  const { errorHandler } = require('../src/middleware/errorHandler');
   const out = {}; const res = { headersSent: false, status(c) { out.status = c; return this; }, json(b) { out.body = b; return this; } };
   errorHandler(new Error('connection string postgres://secret'), { log: { error() {} } }, res, () => {});
   assert.equal(out.status, 500);

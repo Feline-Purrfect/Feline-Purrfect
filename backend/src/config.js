@@ -1,6 +1,4 @@
-'use strict';
-
-const { z } = require('zod');
+import { z } from 'zod';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -29,7 +27,7 @@ if (!parsed.success) {
 
 const env = parsed.data;
 
-module.exports = {
+export default {
   env: env.NODE_ENV,
   isProd: env.NODE_ENV === 'production',
   port: env.PORT,

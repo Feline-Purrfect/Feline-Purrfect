@@ -1,7 +1,5 @@
-'use strict';
-
-const { admin } = require('../lib/supabase');
-const { HttpError } = require('../lib/errors');
+import { admin } from '../lib/supabase.js';
+import { HttpError } from '../lib/errors.js';
 
 // Tiny in-memory cache so a burst of parallel app requests costs one Supabase round-trip,
 // not one each. Short TTL keeps revoked/deleted users from lingering.
@@ -49,4 +47,4 @@ async function requireAuth(req, _res, next) {
   next();
 }
 
-module.exports = { requireAuth, forgetUser };
+export { requireAuth, forgetUser };

@@ -1,5 +1,3 @@
-'use strict';
-
 // Postgres rows are snake_case; the mobile app speaks camelCase. These keep the JSON identical
 // to what the old Lambdas returned.
 
@@ -64,4 +62,4 @@ function toDisease(row) {
   };
 }
 
-module.exports = { toCat, toLog, toDisease, logId };
+export { toCat, toLog, toDisease, logId };

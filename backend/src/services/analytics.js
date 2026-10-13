@@ -1,5 +1,3 @@
-'use strict';
-
 // Direct port of analyzeLogs() from the dashboard-analytics Lambda — same thresholds, same
 // output shape (numbers are returned as fixed-decimal strings, as the app's types expect).
 // `logs` must be newest-first.
@@ -63,4 +61,4 @@ function analyzeLogs(logs) {
   };
 }
 
-module.exports = { analyzeLogs };
+export { analyzeLogs };

@@ -1,10 +1,8 @@
-'use strict';
-
-const express = require('express');
-const { admin } = require('../lib/supabase');
-const { toLog } = require('../lib/mappers');
-const { requireAuth } = require('../middleware/auth');
-const { analyzeLogs } = require('../services/analytics');
+import express from 'express';
+import { admin } from '../lib/supabase.js';
+import { toLog } from '../lib/mappers.js';
+import { requireAuth } from '../middleware/auth.js';
+import { analyzeLogs } from '../services/analytics.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -28,4 +26,4 @@ router.get('/analytics', async (req, res) => {
   res.json({ totalCats: cats.length, analysis });
 });
 
-module.exports = router;
+export default router;

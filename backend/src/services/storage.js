@@ -1,9 +1,7 @@
-'use strict';
-
-const { admin } = require('../lib/supabase');
-const config = require('../config');
-const logger = require('../lib/logger');
-const { HttpError } = require('../lib/errors');
+import { admin } from '../lib/supabase.js';
+import config from '../config.js';
+import logger from '../lib/logger.js';
+import { HttpError } from '../lib/errors.js';
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 const SIGNED_URL_TTL_SECONDS = 7 * 24 * 60 * 60; // same 7 days as the old S3 presigned URLs
@@ -59,4 +57,4 @@ async function deletePhotos(paths) {
   if (error) logger.error({ err: error }, 'Failed to delete photos'); // non-fatal: DB state is what matters
 }
 
-module.exports = { uploadCatPhoto, signPhotoPaths, deletePhotos };
+export { uploadCatPhoto, signPhotoPaths, deletePhotos };

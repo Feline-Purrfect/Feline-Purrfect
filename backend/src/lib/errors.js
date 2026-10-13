@@ -1,5 +1,3 @@
-'use strict';
-
 class HttpError extends Error {
   constructor(status, code, message, details) {
     super(message);
@@ -26,4 +24,4 @@ function parse(schema, data) {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const isUuid = (v) => typeof v === 'string' && UUID_RE.test(v);
 
-module.exports = { HttpError, notFound, parse, isUuid };
+export { HttpError, notFound, parse, isUuid };

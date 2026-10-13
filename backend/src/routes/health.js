@@ -1,7 +1,5 @@
-'use strict';
-
-const express = require('express');
-const { admin } = require('../lib/supabase');
+import express from 'express';
+import { admin } from '../lib/supabase.js';
 
 const router = express.Router();
 
@@ -21,7 +19,7 @@ router.get('/health/ready', async (req, res) => {
       .limit(1);
     if (error) throw error;
     res.json({ status: 'ok', database: 'up', latencyMs: Date.now() - started });
-  } catch (_err) {
+  } catch (err) {
     req.log.error(
       { err: err.message, code: err.code },
       'Readiness check failed',
@@ -34,4 +32,4 @@ router.get('/health/ready', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
