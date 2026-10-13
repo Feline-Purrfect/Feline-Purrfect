@@ -1,6 +1,6 @@
-import { LoadingIndicator } from 'components/common/LoadingIndicator';
+import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { useAuth } from '@/hooks/useAuth';
 import { Redirect } from 'expo-router';
-import { useAuth } from 'hooks/useAuth';
 
 export default function Index() {
   const { isAuthenticated, user } = useAuth();
