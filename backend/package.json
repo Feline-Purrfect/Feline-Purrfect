@@ -2,7 +2,7 @@
   "name": "feline-purrfect-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Feline Purrfect API \u2014 Express + Supabase, deployed on Render",
+  "description": "Feline Purrfect API — Express + Supabase, deployed on Render",
   "main": "src/server.js",
   "engines": {
     "node": ">=20.6"
@@ -17,7 +17,8 @@
     "test": "node --test test/routes.test.js"
   },
   "dependencies": {
-    "@sentry/node": "^9.0.0",
+    "@sentry/node": "^9.47.2",
+    "@sentry/profiling-node": "^11.7.0",
     "@supabase/supabase-js": "^2.45.0",
     "cors": "^2.8.5",
     "expo-server-sdk": "^3.14.0",
