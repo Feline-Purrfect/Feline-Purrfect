@@ -22,7 +22,7 @@ export default function SignupScreen() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  
+
   const { mutate: signUp, isPending } = useSignUp();
 
   const validateForm = () => {
@@ -64,7 +64,7 @@ export default function SignupScreen() {
     if (!hasUpperCase || !hasLowerCase || !hasNumber || !hasSpecialChar) {
       Alert.alert(
         'Weak Password',
-        'Password must contain:\n• Uppercase letter\n• Lowercase letter\n• Number\n• Special character'
+        'Password must contain:\n• Uppercase letter\n• Lowercase letter\n• Number\n• Special character',
       );
       return false;
     }
@@ -81,47 +81,39 @@ export default function SignupScreen() {
   const handleSignup = async () => {
     if (!validateForm()) return;
 
-    try {
-      await signUp({ 
-        email: email.trim().toLowerCase(), 
-        password, 
-        name: name.trim()
-      });
-      
-      // Navigate to verification screen
-      Alert.alert(
-        'Verification Required',
-        `We've sent a verification code to your email. Please check your inbox.`,
-        [
-          {
-            text: 'OK',
-            onPress: () => router.push({
-              pathname: '/verify-email',
-              params: { email: email.trim().toLowerCase() }
-            })
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      
-      if (error.code === 'UsernameExistsException') {
-        Alert.alert('Error', 'An account with this email already exists');
-      } else if (error.code === 'InvalidPasswordException') {
-        Alert.alert('Error', 'Password does not meet requirements');
-      } else {
-        Alert.alert('Error', error.message || 'Failed to create account');
-      }
-    }
+    const normalizedEmail = email.trim().toLowerCase();
+
+    signUp(
+      { email: normalizedEmail, password, name: name.trim() },
+      {
+        onSuccess: () => {
+          Alert.alert(
+            'Verification Required',
+            "We've sent a verification code to your email. Please check your inbox.",
+            [
+              {
+                text: 'OK',
+                onPress: () =>
+                  router.push({
+                    pathname: '/verify-email',
+                    params: { email: normalizedEmail },
+                  }),
+              },
+            ],
+          );
+        },
+        // Errors are already shown by useSignUp's onError, so there is nothing to add here.
+      },
+    );
   };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined} 
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1"
       >
-        <ScrollView 
+        <ScrollView
           className="flex-1"
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
@@ -132,13 +124,17 @@ export default function SignupScreen() {
               <View className="w-20 h-20 bg-primary-100 rounded-full items-center justify-center mb-4">
                 <FontAwesome6 name="cat" size={40} color="#155C8D" />
               </View>
-              <Text className="text-3xl font-bold text-black">Create Account</Text>
+              <Text className="text-3xl font-bold text-black">
+                Create Account
+              </Text>
               <Text className="text-gray mt-2">Sign up to get started</Text>
             </View>
 
             {/* Name Input */}
             <View className="mb-4">
-              <Text className="text-gray-700 font-semibold mb-2">Full Name</Text>
+              <Text className="text-gray-700 font-semibold mb-2">
+                Full Name
+              </Text>
               <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                 <FontAwesome6 name="user" size={16} color="#9ca3af" />
                 <TextInput
@@ -183,11 +179,13 @@ export default function SignupScreen() {
                   autoComplete="password-new"
                   className="flex-1 ml-3 text-gray-800"
                 />
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
-                  <FontAwesome6 
-                    name={showPassword ? 'eye' : 'eye-slash'} 
-                    size={16} 
-                    color="#9ca3af" 
+                <TouchableOpacity
+                  onPress={() => setShowPassword(!showPassword)}
+                >
+                  <FontAwesome6
+                    name={showPassword ? 'eye' : 'eye-slash'}
+                    size={16}
+                    color="#9ca3af"
                   />
                 </TouchableOpacity>
               </View>
@@ -198,7 +196,9 @@ export default function SignupScreen() {
 
             {/* Confirm Password Input */}
             <View className="mb-4">
-              <Text className="text-gray-700 font-semibold mb-2">Confirm Password</Text>
+              <Text className="text-gray-700 font-semibold mb-2">
+                Confirm Password
+              </Text>
               <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
                 <FontAwesome6 name="lock" size={16} color="#9ca3af" />
                 <TextInput
@@ -210,11 +210,13 @@ export default function SignupScreen() {
                   autoComplete="password-new"
                   className="flex-1 ml-3 text-gray-800"
                 />
-                <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
-                  <FontAwesome6 
-                    name={showConfirmPassword ? 'eye' : 'eye-slash'} 
-                    size={16} 
-                    color="#9ca3af" 
+                <TouchableOpacity
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                >
+                  <FontAwesome6
+                    name={showConfirmPassword ? 'eye' : 'eye-slash'}
+                    size={16}
+                    color="#9ca3af"
                   />
                 </TouchableOpacity>
               </View>
@@ -232,7 +234,9 @@ export default function SignupScreen() {
               <Text className="text-gray-600">Already have an account? </Text>
               <Link href="/login" asChild>
                 <TouchableOpacity>
-                  <Text className="text-primary-600 font-semibold">Sign In</Text>
+                  <Text className="text-primary-600 font-semibold">
+                    Sign In
+                  </Text>
                 </TouchableOpacity>
               </Link>
             </View>
