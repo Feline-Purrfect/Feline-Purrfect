@@ -15,11 +15,7 @@ function sniffImageType(buf) {
   return null;
 }
 
-/**
- * Upload a base64 / data-URI image. One fixed object per cat (overwritten on change), so there
- * are never orphaned files. Returns the storage path to persist in cats.photo_path.
- */
-async function uploadCatPhoto(userId, catId, dataUri) {
+function decodeImage(dataUri) {
   const base64 = String(dataUri).replace(/^data:image\/[\w.+-]+;base64,/, '');
   const buffer = Buffer.from(base64, 'base64');
 
@@ -28,12 +24,24 @@ async function uploadCatPhoto(userId, catId, dataUri) {
 
   const contentType = sniffImageType(buffer); // trust the bytes, not the client's claim
   if (!contentType) throw new HttpError(400, 'ValidationError', 'Photo must be a JPEG, PNG or WebP image');
+  return { buffer, contentType };
+}
 
-  const path = `${userId}/${catId}/profile`;
-  const { error } = await bucket().upload(path, buffer, { contentType, upsert: true, cacheControl: '3600' });
+async function uploadImage(path, dataUri, { upsert = false } = {}) {
+  const { buffer, contentType } = decodeImage(dataUri);
+  const { error } = await bucket().upload(path, buffer, { contentType, upsert, cacheControl: '3600' });
   if (error) throw error;
   return path;
 }
+
+/**
+ * Profile/cover photo. One fixed object per cat (overwritten on change), so there are never orphaned
+ * files. Returns the storage path to persist in cats.photo_path.
+ */
+const uploadCatPhoto = (userId, catId, dataUri) => uploadImage(`${userId}/${catId}/profile`, dataUri, { upsert: true });
+
+/** Gallery photo. One object per photo row; the caller supplies the new photo_id. */
+const uploadGalleryPhoto = (userId, catId, photoId, dataUri) => uploadImage(`${userId}/${catId}/photos/${photoId}`, dataUri);
 
 /** Sign many paths in a single call. Failures degrade to "no photo" rather than failing the request. */
 async function signPhotoPaths(paths) {
@@ -57,4 +65,4 @@ async function deletePhotos(paths) {
   if (error) logger.error({ err: error }, 'Failed to delete photos'); // non-fatal: DB state is what matters
 }
 
-export { uploadCatPhoto, signPhotoPaths, deletePhotos };
+export { uploadCatPhoto, uploadGalleryPhoto, signPhotoPaths, deletePhotos };

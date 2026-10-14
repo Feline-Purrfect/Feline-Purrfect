@@ -1,5 +1,6 @@
 import { AuthGuard } from '@/components/common/AuthGuard';
 import { Colors } from '@/constants/colors';
+import { Fonts } from '@/constants/theme';
 import {
   FontAwesome6,
   Entypo as HomeIcon,
@@ -16,7 +17,13 @@ export default function TabLayout() {
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors.primary.DEFAULT,
-          tabBarInactiveTintColor: Colors.gray.DEFAULT,
+          tabBarInactiveTintColor: Colors.ink.faint,
+          tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.line.DEFAULT, borderTopWidth: 1 },
+          tabBarLabelStyle: { fontFamily: Fonts.bodySemibold, fontSize: 11 },
+          sceneStyle: { backgroundColor: Colors.canvas },
+          headerStyle: { backgroundColor: Colors.canvas },
+          headerShadowVisible: false,
+          headerTitleStyle: { fontFamily: Fonts.bodyBold, fontSize: 17, color: Colors.ink.DEFAULT },
         }}
       >
         <Tabs.Screen
@@ -67,8 +74,9 @@ export default function TabLayout() {
         <Tabs.Screen
           name="my-cats"
           options={{
-            title: 'My Cats',
-            tabBarLabel: 'My Cats',
+            title: 'Cats',
+            tabBarLabel: 'Cats',
+            headerShown: false, // the screen draws its own large "My cats" title
             tabBarIcon: ({ color, size }) => (
               <MyCatsIcon name="cat" size={size - 3} color={color} />
             ),

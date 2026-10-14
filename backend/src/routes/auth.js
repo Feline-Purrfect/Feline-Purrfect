@@ -177,11 +177,15 @@ router.put('/update-profile', requireAuth, async (req, res) => {
 
 // App Store guideline 5.1.1(v): in-app account deletion must really delete the account and data.
 router.delete('/delete-account', requireAuth, async (req, res) => {
-  const { data: cats, error: catsError } = await admin.from('cats').select('photo_path').eq('user_id', req.user.id);
+  const [{ data: cats, error: catsError }, { data: gallery, error: galleryError }] = await Promise.all([
+    admin.from('cats').select('photo_path').eq('user_id', req.user.id),
+    admin.from('cat_photos').select('path').eq('user_id', req.user.id),
+  ]);
   if (catsError) throw catsError;
-  await deletePhotos((cats ?? []).map((c) => c.photo_path));
+  if (galleryError) throw galleryError;
+  await deletePhotos([...(cats ?? []).map((c) => c.photo_path), ...(gallery ?? []).map((p) => p.path)]);
 
-  // Foreign keys are ON DELETE CASCADE, so this also removes cats, logs and device tokens.
+  // Foreign keys are ON DELETE CASCADE, so this also removes cats, logs, photo rows and device tokens.
   const { error } = await admin.auth.admin.deleteUser(req.user.id);
   if (error) throw authError(error);
 

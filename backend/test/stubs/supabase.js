@@ -1,4 +1,4 @@
-import { db, authResponses } from '../fakes.js';
+import { db, authResponses, storageCalls } from '../fakes.js';
 
 const fakeAuthClient = () => new Proxy({}, {
   get: (_t, group) => (group === 'auth'
@@ -20,9 +20,9 @@ export const admin = {
   auth: adminAuth,
   storage: {
     from: () => ({
-      createSignedUrls: async () => ({ data: [], error: null }),
-      remove: async () => ({ error: null }),
-      upload: async () => ({ error: null }),
+      createSignedUrls: async (paths) => ({ data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}` })), error: null }),
+      remove: async (paths) => { storageCalls.removed.push(...paths); return { error: null }; },
+      upload: async (path) => { storageCalls.uploaded.push(path); return { error: null }; },
     }),
   },
 };

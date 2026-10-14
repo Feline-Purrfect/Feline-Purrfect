@@ -8,7 +8,7 @@ const router = express.Router();
 router.use(requireAuth);
 
 router.get('/analytics', async (req, res) => {
-  const { data: cats, error } = await admin.from('cats').select('cat_id,name,breed').eq('user_id', req.user.id).order('created_at', { ascending: true });
+  const { data: cats, error } = await admin.from('cats').select('cat_id,name,breed').eq('user_id', req.user.id).is('archived_at', null).order('created_at', { ascending: true });
   if (error) throw error;
 
   const analysis = await Promise.all(cats.map(async (cat) => {

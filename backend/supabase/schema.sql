@@ -15,24 +15,41 @@ end $$;
 
 -- ---------------------------------------------------------------- cats
 create table if not exists public.cats (
-  cat_id        uuid primary key default gen_random_uuid(),
-  user_id       uuid not null references auth.users(id) on delete cascade,
-  name          text not null check (char_length(name) between 1 and 100),
-  age           double precision not null default 0 check (age >= 0),
-  sex           text not null default 'female' check (sex in ('male','female')),
-  adopted_date  timestamptz not null default now(),
-  weight        double precision check (weight is null or weight >= 0),
-  breed         text,
-  color         text,
-  microchip_id  text,
-  photo_path    text,                       -- path inside the storage bucket (signed on read)
-  created_at    timestamptz not null default now(),
-  updated_at    timestamptz not null default now()
+  cat_id                uuid primary key default gen_random_uuid(),
+  user_id               uuid not null references auth.users(id) on delete cascade,
+  name                  text not null check (char_length(name) between 1 and 100),
+  age                   double precision check (age >= 0),   -- deprecated: derived from birth_date by the API
+  birth_date            date not null check (birth_date <= current_date + 1),
+  birth_date_estimated  boolean not null default false,
+  sex                   text not null default 'female' check (sex in ('male','female')),
+  adopted_date          date not null default current_date,
+  weight                double precision check (weight is null or weight >= 0),   -- always kilograms
+  weight_unit           text not null default 'kg' check (weight_unit in ('kg','lb')), -- display preference
+  breed                 text,
+  color                 text,
+  microchip_id          text check (microchip_id is null or microchip_id ~ '^\d{9,15}$'),
+  photo_path            text,                       -- profile/cover photo path in the storage bucket
+  archived_at           timestamptz,                -- set when a cat has passed away; reminders stop
+  created_at            timestamptz not null default now(),
+  updated_at            timestamptz not null default now()
 );
 create index if not exists cats_user_id_idx on public.cats (user_id);
+create index if not exists cats_user_active_idx on public.cats (user_id) where archived_at is null;
 drop trigger if exists cats_set_updated_at on public.cats;
 create trigger cats_set_updated_at before update on public.cats
   for each row execute function public.set_updated_at();
+
+-- ---------------------------------------------------------------- cat photo gallery
+create table if not exists public.cat_photos (
+  photo_id    uuid primary key default gen_random_uuid(),
+  cat_id      uuid not null references public.cats(cat_id) on delete cascade,
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  path        text not null unique,
+  taken_on    date not null default current_date,
+  created_at  timestamptz not null default now()
+);
+create index if not exists cat_photos_cat_idx  on public.cat_photos (cat_id,  taken_on desc, created_at desc);
+create index if not exists cat_photos_user_idx on public.cat_photos (user_id, taken_on desc, created_at desc);
 
 -- ---------------------------------------------------------------- logs
 -- One row per cat per day (same as the DynamoDB catId + date key).
@@ -95,16 +112,18 @@ create trigger device_tokens_set_updated_at before update on public.device_token
 create or replace function public.cats_missing_log(day date)
 returns table (user_id uuid, cat_id uuid, name text, total_cats integer)
 language sql stable security definer set search_path = public as $$
-  with totals as (
-    select c.user_id, count(*)::int as total from public.cats c group by c.user_id
+  with active as (
+    select * from public.cats where archived_at is null
+  ), totals as (
+    select a.user_id, count(*)::int as total from active a group by a.user_id
   )
-  select c.user_id, c.cat_id, c.name, t.total
-  from public.cats c
-  join totals t on t.user_id = c.user_id
+  select a.user_id, a.cat_id, a.name, t.total
+  from active a
+  join totals t on t.user_id = a.user_id
   where not exists (
-    select 1 from public.logs l where l.cat_id = c.cat_id and l.log_date = day
+    select 1 from public.logs l where l.cat_id = a.cat_id and l.log_date = day
   )
-  order by c.user_id, c.created_at;
+  order by a.user_id, a.created_at;
 $$;
 revoke all on function public.cats_missing_log(date) from public, anon, authenticated;
 grant execute on function public.cats_missing_log(date) to service_role;
@@ -114,6 +133,7 @@ grant execute on function public.cats_missing_log(date) to service_role;
 -- ownership itself. Enabling RLS with NO policies means the public anon key can never read
 -- or write these tables directly through Supabase's auto-generated REST API.
 alter table public.cats          enable row level security;
+alter table public.cat_photos    enable row level security;
 alter table public.logs          enable row level security;
 alter table public.diseases      enable row level security;
 alter table public.device_tokens enable row level security;

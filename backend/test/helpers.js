@@ -2,9 +2,9 @@
 // so route logic (validation, ownership, mapping, error codes) is testable offline.
 // Module redirection happens in test/hooks.js (registered by test/setup.js).
 import { errorHandler } from '../src/middleware/errorHandler.js';
-import { db, authResponses } from './fakes.js';
+import { db, authResponses, storageCalls } from './fakes.js';
 
-export { db, authResponses };
+export { db, authResponses, storageCalls };
 
 export const USER_A = '11111111-1111-4111-8111-111111111111';
 export const USER_B = '22222222-2222-4222-8222-222222222222';

@@ -8,6 +8,10 @@ export interface LogRequest {
   weight?: number | null;
   temperature?: number | null;
   notes?: string | null;
+  appetite?: number | null; // 1–5
+  energy?: number | null;   // 1–5
+  vomiting?: boolean | null;
+  diarrhea?: boolean | null;
 }
 
 export interface LogResponse extends LogRequest {
