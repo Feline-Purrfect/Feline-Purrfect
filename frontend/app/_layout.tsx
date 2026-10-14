@@ -43,7 +43,7 @@ export default Sentry.wrap(function RootLayout() {
           <Stack.Screen name="(auth)/change-password" options={{ title: 'Change password' }} />
           <Stack.Screen name="(auth)/forgot-password" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-          <Stack.Screen name="/(screens)/dashboard/analytics" options={{ title: 'Detailed Analytics' }} />
+          <Stack.Screen name="(screens)/dashboard/analytics" options={{ title: 'Detailed Analytics' }} />
           <Stack.Screen
             name="(screens)/my-cats/create"
             options={{ title: 'Add New Cat' }}

@@ -1,6 +1,8 @@
+import { ErrorView } from '@/components/common/ErrorView';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { useCats } from '@/hooks/useCats';
 import { useDashboardAnalytics } from '@/hooks/useDashboard';
+import { isSessionExpired } from '@/lib/api/client';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
 import { router } from 'expo-router';
 import { useFocusEffect } from 'expo-router/react-navigation';
@@ -17,11 +19,13 @@ export default function HomeScreen() {
   const {
     data: cats = [],
     isLoading: catsLoading,
+    error: catsError,
     refetch: refetchCats,
   } = useCats();
   const {
     data: analytics,
     isLoading: analyticsLoading,
+    error: analyticsError,
     refetch: refetchAnalytics,
   } = useDashboardAnalytics();
 
@@ -48,6 +52,18 @@ export default function HomeScreen() {
 
   if (isLoading) {
     return <LoadingIndicator />;
+  }
+
+  const error = catsError ?? analyticsError;
+  if (error) {
+    // Session expiry is handled globally (sign-out + redirect); just avoid flashing a second message.
+    if (isSessionExpired(error)) return <LoadingIndicator />;
+    return (
+      <ErrorView
+        message={(error as any)?.message || 'Could not load your dashboard.'}
+        onRetry={onRefresh}
+      />
+    );
   }
 
   if (cats.length === 0) {
