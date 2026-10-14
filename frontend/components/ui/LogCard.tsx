@@ -22,9 +22,9 @@ export function LogCard({ log, cat, onPress }: LogCardProps) {
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center">
             <View className="w-10 h-10 rounded-full bg-primary-100 items-center justify-center mr-3">
-              {cat.photoUri && (
+              {cat.photoUrl && (
                 <Image
-                  source={{ uri: cat.photoUri }}
+                  source={{ uri: cat.photoUrl }}
                   className="w-full h-full rounded-full"
                   resizeMode="cover"
                 />
@@ -113,9 +113,9 @@ export function AddLogCard({ cat, onPress }: AddLogCardProps) {
         <View className="flex-row items-center justify-between mb-3">
           <View className="flex-row items-center">
             <View className="w-10 h-10 rounded-full bg-primary items-center justify-center mr-3">
-              {cat.photoUri && (
+              {cat.photoUrl && (
                 <Image 
-                  source={{ uri: cat.photoUri }} 
+                  source={{ uri: cat.photoUrl }} 
                   className="w-full h-full rounded-full"
                   resizeMode="cover"
                 />

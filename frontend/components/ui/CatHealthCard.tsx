@@ -50,15 +50,15 @@ export function CatHealthCard({ cat, recentLogs }: CatHealthCardProps) {
 
   return (
     <TouchableOpacity
-      onPress={() => router.push(`/(screens)/my-cats/${cat.id}`)}
+      onPress={() => router.push(`/(screens)/my-cats/${cat.catId}`)}
       className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-4 active:opacity-90"
       activeOpacity={0.9}
     >
       {/* Header */}
       <View className="flex-row items-center p-4 bg-gray-50">
-        {cat.photoUri ? (
+        {cat.photoUrl ? (
           <Image 
-            source={{ uri: cat.photoUri }} 
+            source={{ uri: cat.photoUrl }} 
             className="w-12 h-12 rounded-full mr-3"
           />
         ) : (
