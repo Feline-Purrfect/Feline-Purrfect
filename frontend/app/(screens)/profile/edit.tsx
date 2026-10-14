@@ -1,4 +1,5 @@
 import { authApi } from '@/api/auth';
+import { AUTH_QUERY_KEY } from '@/lib/api/client';
 import { CustomButton } from '@/components/common/CustomButton';
 import { useAuth, useDeleteAccount } from '@/hooks/useAuth';
 import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
@@ -42,7 +43,7 @@ export default function EditProfileScreen() {
       const updatedUser = await authApi.updateProfile(name);
       
       // Update the query cache with new user data
-      queryClient.setQueryData(['auth', 'user'], updatedUser);
+      queryClient.setQueryData(AUTH_QUERY_KEY, updatedUser);
 
       Alert.alert(
         'Success',

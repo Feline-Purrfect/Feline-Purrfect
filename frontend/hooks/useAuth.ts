@@ -1,10 +1,15 @@
 import { authApi } from '@/api/auth';
+import { AUTH_QUERY_KEY } from '@/lib/api/client';
 import { AuthUser, SignInRequest, SignUpRequest } from '@/types/auth';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { Alert } from 'react-native';
 
-const AUTH_QUERY_KEY = ['auth', 'user'];
+/** Drop every cached query that belongs to the previous user, keeping the auth query itself. */
+function resetUserData(queryClient: QueryClient, user: AuthUser | null) {
+  queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== AUTH_QUERY_KEY[0] });
+  queryClient.setQueryData(AUTH_QUERY_KEY, user);
+}
 
 // Get current user
 export function useAuth() {
@@ -114,8 +119,8 @@ export function useSignIn() {
   return useMutation({
     mutationFn: (data: SignInRequest) => authApi.signIn(data),
     onSuccess: (response) => {
-      // Update query cache with user data
-      queryClient.setQueryData(AUTH_QUERY_KEY, response.user);
+      // Fresh session: never show cats/logs cached from a previous account (the device may be shared).
+      resetUserData(queryClient, response.user);
 
       // Navigate to home
       router.replace('/(tabs)');
@@ -123,7 +128,11 @@ export function useSignIn() {
     onError: (error: any, variables: SignInRequest) => {
       console.error('Failed to sign in:', error);
 
+      // The API returns NotAuthorizedException for a WRONG PASSWORD and UserNotConfirmedException for an
+      // unverified email. These were swapped before, so a typo'd password sent users to the verify screen.
       if (error.code === 'NotAuthorizedException') {
+        Alert.alert('Sign In Failed', 'Invalid email or password.');
+      } else if (error.code === 'UserNotConfirmedException') {
         Alert.alert(
           'Email Not Verified',
           "Your account isn't verified yet. We'll send you a new code.",
@@ -138,11 +147,6 @@ export function useSignIn() {
                 }),
             },
           ],
-        );
-      } else if (error.code === 'UserNotConfirmedException') {
-        Alert.alert(
-          'Email Not Verified',
-          'Please verify your email before signing in.',
         );
       } else if (error.code === 'UserNotFoundException') {
         Alert.alert('Account Not Found', 'No account exists with this email.');
@@ -168,11 +172,7 @@ export function useSignOut() {
   return useMutation({
     mutationFn: authApi.signOut,
     onSuccess: () => {
-      // Clear user from cache
-      queryClient.setQueryData(AUTH_QUERY_KEY, null);
-      queryClient.clear();
-
-      // Navigate to login
+      resetUserData(queryClient, null);
       router.replace('/(auth)/login');
     },
     onError: (error: any) => {
@@ -297,11 +297,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: () => authApi.deleteAccount(),
     onSuccess: () => {
-      // Clear user from cache
-      queryClient.setQueryData(AUTH_QUERY_KEY, null);
-      queryClient.clear();
-
-      // Navigate to login
+      resetUserData(queryClient, null);
       router.replace('/(auth)/login');
 
       Alert.alert(
@@ -326,6 +322,3 @@ export function useDeleteAccount() {
     },
   });
 }
-
-// Get Auth Token (utility)
-export const getAuthToken = authApi.getAuthToken;

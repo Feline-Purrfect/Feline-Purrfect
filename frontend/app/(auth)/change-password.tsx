@@ -67,35 +67,16 @@ export default function ChangePasswordScreen() {
     return true;
   };
 
-  const handleChangePassword = async () => {
+  const handleChangePassword = () => {
     if (!validatePassword()) return;
 
-    try {
-      await changePassword({ oldPassword: currentPassword, newPassword });
-      
-      Alert.alert(
-        'Success',
-        'Your password has been changed successfully!',
-        [
-          {
-            text: 'OK',
-            onPress: () => router.back()
-          }
-        ]
-      );
-    } catch (error: any) {
-      console.error('Change password error:', error);
-      
-      if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Error', 'Current password is incorrect');
-      } else if (error.code === 'InvalidPasswordException') {
-        Alert.alert('Error', 'Password does not meet requirements');
-      } else if (error.code === 'LimitExceededException') {
-        Alert.alert('Error', 'Too many attempts. Please try again later.');
-      } else {
-        Alert.alert('Error', error.message || 'Failed to change password');
-      }
-    }
+    // `mutate` does not return a promise, so the old `await changePassword(...)` + try/catch showed
+    // "Success" immediately even when the request failed, and the catch never ran.
+    // Success/error alerts are shown by useChangePassword; here we only navigate on success.
+    changePassword(
+      { oldPassword: currentPassword, newPassword },
+      { onSuccess: () => router.back() },
+    );
   };
 
   return (
