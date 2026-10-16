@@ -3,8 +3,7 @@ import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { LogForm } from '@/components/logs/LogForm';
 import { useCat } from '@/hooks/useCats';
 import { useDeleteLog, useLog, useUpdateLog } from '@/hooks/useLogs';
-import { router, useLocalSearchParams } from 'expo-router';
-import { Alert } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
 
 /** Edit / finish a log. Route: /logs/<logId>/edit. */
 export default function EditLogScreen() {
@@ -15,23 +14,24 @@ export default function EditLogScreen() {
   const remove = useDeleteLog();
 
   if (isLoading || (log && catLoading && !cat)) return <LoadingIndicator />;
-  if (!log || !cat) return <ErrorView message={(error as any)?.message ?? 'This log couldn’t be found.'} onRetry={() => refetch()} />;
-
-  const confirmDelete = () =>
-    Alert.alert('Delete this log?', `${cat.name}’s entry for this day will be removed. Photos stay in the album.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => remove.mutate(log.id, { onSuccess: () => router.dismissTo('/logs') }) },
-    ]);
+  if (!log || !cat)
+    return (
+      <ErrorView
+        message={(error as any)?.message ?? 'This log couldn’t be found.'}
+        onRetry={() => refetch()}
+      />
+    );
 
   return (
+    // No `key` on purpose: remounting when the saved log refetches would cancel the form's
+    // "go back after saving".
     <LogForm
-      key={log.updatedAt}
       cat={cat}
       date={log.date}
       initial={log}
       submitting={update.isPending}
-      onSubmit={(values) => update.mutate({ id: log.id, ...values }, { onSuccess: () => router.back() })}
-      onDelete={confirmDelete}
+      onSubmit={(values) => update.mutateAsync({ id: log.id, ...values })}
+      onDelete={() => remove.mutateAsync(log.id)}
     />
   );
 }

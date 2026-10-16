@@ -10,7 +10,8 @@ export const catKeys = {
   archived: ['cats', 'list', 'archived'] as const,
   detail: (catId: string) => ['cats', 'detail', catId] as const,
   photos: (catId: string) => ['cats', 'photos', catId] as const,
-  photosOn: (catId: string, date: string) => ['cats', 'photos', catId, date] as const,
+  photosOn: (catId: string, date: string) =>
+    ['cats', 'photos', catId, date] as const,
   recentPhotos: ['cats', 'photos', 'recent'] as const,
 };
 
@@ -48,8 +49,12 @@ export function useCat(catId: string) {
     enabled: !!catId,
     staleTime: 1000 * 30,
     placeholderData: () =>
-      queryClient.getQueryData<CatResponse[]>(catKeys.active)?.find((c) => c.catId === catId) ??
-      queryClient.getQueryData<CatResponse[]>(catKeys.archived)?.find((c) => c.catId === catId),
+      queryClient
+        .getQueryData<CatResponse[]>(catKeys.active)
+        ?.find((c) => c.catId === catId) ??
+      queryClient
+        .getQueryData<CatResponse[]>(catKeys.archived)
+        ?.find((c) => c.catId === catId),
   });
 }
 
@@ -65,7 +70,12 @@ export function useCatPhotos(catId: string) {
 export function useCatPhotosOn(catId: string, date: string) {
   return useQuery({
     queryKey: catKeys.photosOn(catId, date),
-    queryFn: async () => (await catsApi.getCatPhotos(catId, { on: date, limit: 12 })).photos,
+    // Filter here too: a backend without the ?on= filter returns every photo, which made old photos
+    // show up on every day's log.
+    queryFn: async () =>
+      (
+        await catsApi.getCatPhotos(catId, { on: date, limit: 12 })
+      ).photos.filter((p) => p.takenOn === date),
     enabled: !!catId && !!date,
   });
 }

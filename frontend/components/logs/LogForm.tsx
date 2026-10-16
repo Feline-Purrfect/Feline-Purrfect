@@ -29,7 +29,7 @@ import {
   symptomLabel,
   WATER_UNITS,
 } from '@/lib/logs';
-import { CatResponse, WeightUnit } from '@/types/cat';
+import { CatPhoto, CatResponse, WeightUnit } from '@/types/cat';
 import {
   DoseUnit,
   FoodUnit,
@@ -39,9 +39,14 @@ import {
   WaterUnit,
 } from '@/types/log';
 import Feather from '@expo/vector-icons/Feather';
-import { useHeaderHeight } from 'expo-router/react-navigation';
-import { useRef, useState } from 'react';
+import { router, useNavigation } from 'expo-router';
 import {
+  useHeaderHeight,
+  usePreventRemove,
+} from 'expo-router/react-navigation';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -59,8 +64,10 @@ interface LogFormProps {
   initial?: LogResponse | null; // editing / finishing an existing log
   lastUnits?: { food?: FoodUnit | null; water?: WaterUnit | null }; // default to what this cat was last logged in
   submitting: boolean;
-  onSubmit: (values: LogFormValues) => void;
-  onDelete?: () => void;
+  /** Save the log. Resolve on success, reject on failure (the hook already shows the error). */
+  onSubmit: (values: LogFormValues) => Promise<unknown>;
+  /** Delete the log (edit mode). The form asks for confirmation first. */
+  onDelete?: () => Promise<unknown>;
 }
 
 type MedRow = { key: number; name: string; dose: string; unit: DoseUnit };
@@ -222,10 +229,32 @@ export function LogForm({
   // Index of the photo open in the carousel; null = closed.
   const [viewing, setViewing] = useState<number | null>(null);
 
-  const { data: photos = [] } = useCatPhotosOn(cat.catId, date);
+  // Photo changes are held here and only sent when the log is saved, so leaving without saving
+  // leaves the album untouched.
+  const [pendingAdds, setPendingAdds] = useState<string[]>([]); // local file URIs
+  const [pendingDeletes, setPendingDeletes] = useState<string[]>([]); // photoIds
+  const [savingPhotos, setSavingPhotos] = useState(false);
+  // Set once saved/deleted so the leave-confirmation doesn't block our own navigation.
+  const [leaveTo, setLeaveTo] = useState<'back' | 'logs' | null>(null);
+
+  const { data: savedPhotos = [] } = useCatPhotosOn(cat.catId, date);
   const addPhoto = useAddCatPhoto();
   const deletePhoto = useDeleteCatPhoto();
   const { pickImage } = useImagePicker({ allowsEditing: false, quality: 0.7 });
+
+  const photos: CatPhoto[] = useMemo(
+    () => [
+      ...savedPhotos.filter((p) => !pendingDeletes.includes(p.photoId)),
+      ...pendingAdds.map((uri, i) => ({
+        photoId: `local-${i}`,
+        catId: cat.catId,
+        url: uri,
+        takenOn: date,
+        createdAt: '',
+      })),
+    ],
+    [savedPhotos, pendingDeletes, pendingAdds, cat.catId, date],
+  );
 
   const isToday = date === todayYmd();
   const dateLabel = isToday
@@ -300,39 +329,153 @@ export function LogForm({
     return e;
   };
 
-  const submit = () => {
+  const values = (): LogFormValues => ({
+    foodAmount: toNum(food),
+    foodUnit,
+    waterAmount: toNum(water),
+    waterUnit,
+    pooCount: poo,
+    peeCount: pee,
+    symptoms,
+    teethBrushed: teeth,
+    medications: meds
+      .filter((m) => m.name.trim())
+      .map((m) => ({
+        name: m.name.trim(),
+        dose: m.dose.trim() ? toNum(m.dose) : null,
+        unit: m.unit,
+      })),
+    weight: weight.trim()
+      ? Math.round(toKg(toNum(weight), weightUnit) * 100) / 100
+      : null,
+    temperature: temp.trim() ? toNum(temp) : null,
+    notes: notes.trim() || null,
+  });
+
+  // ---------------------------------------------------------------- unsaved changes
+  // Snapshot of the starting values; anything different (or any photo change) counts as unsaved.
+  // Compare the raw field text (not parsed numbers) so typing "0" into an empty field still counts.
+  const formSnapshot = () =>
+    JSON.stringify({
+      food,
+      foodUnit,
+      water,
+      waterUnit,
+      poo,
+      pee,
+      symptoms,
+      teeth,
+      weight,
+      weightUnit,
+      temp,
+      meds: meds.map(({ name, dose, unit }) => ({ name, dose, unit })),
+      notes,
+    });
+  const [initialSnapshot] = useState(formSnapshot);
+  const dirty =
+    formSnapshot() !== initialSnapshot ||
+    pendingAdds.length > 0 ||
+    pendingDeletes.length > 0;
+
+  const navigation = useNavigation();
+  usePreventRemove(dirty && leaveTo === null, ({ data }) => {
+    Alert.alert(
+      initial ? 'Discard changes?' : 'Discard this log?',
+      initial
+        ? 'Your changes haven’t been saved and will be lost.'
+        : 'This log hasn’t been saved and will be lost.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => navigation.dispatch(data.action),
+        },
+      ],
+    );
+  });
+
+  // Navigate only after `leaveTo` has switched the prevention off.
+  useEffect(() => {
+    if (leaveTo === 'back') router.back();
+    if (leaveTo === 'logs') router.dismissTo('/logs');
+  }, [leaveTo]);
+
+  const submit = async () => {
     const e = validate();
     setErrors(e);
     if (Object.keys(e).length) return;
-    onSubmit({
-      foodAmount: toNum(food),
-      foodUnit,
-      waterAmount: toNum(water),
-      waterUnit,
-      pooCount: poo,
-      peeCount: pee,
-      symptoms,
-      teethBrushed: teeth,
-      medications: meds
-        .filter((m) => m.name.trim())
-        .map((m) => ({
-          name: m.name.trim(),
-          dose: m.dose.trim() ? toNum(m.dose) : null,
-          unit: m.unit,
-        })),
-      weight: weight.trim()
-        ? Math.round(toKg(toNum(weight), weightUnit) * 100) / 100
-        : null,
-      temperature: temp.trim() ? toNum(temp) : null,
-      notes: notes.trim() || null,
-    });
+    try {
+      await onSubmit(values());
+    } catch {
+      return; // the save hook already showed the error; stay on the form
+    }
+
+    // Log saved — now apply the photo changes.
+    if (pendingAdds.length || pendingDeletes.length) {
+      setSavingPhotos(true);
+      let failed = 0;
+      for (const uri of pendingAdds) {
+        try {
+          await addPhoto.mutateAsync({ catId: cat.catId, uri, takenOn: date });
+        } catch {
+          failed++;
+        }
+      }
+      for (const photoId of pendingDeletes) {
+        try {
+          await deletePhoto.mutateAsync({ catId: cat.catId, photoId });
+        } catch {
+          failed++;
+        }
+      }
+      setSavingPhotos(false);
+      if (failed) {
+        Alert.alert(
+          'Log saved',
+          `${failed === 1 ? 'One photo change' : `${failed} photo changes`} couldn’t be saved. You can try again from the log.`,
+        );
+      }
+    }
+    setLeaveTo('back');
+  };
+
+  const confirmDelete = () => {
+    if (!onDelete) return;
+    Alert.alert(
+      'Delete this log?',
+      `${cat.name}’s entry for this day will be removed. Photos stay in the album.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // Leave first, then delete: once the log is gone this screen has nothing to show, and
+            // waiting for the delete could unmount the form before it navigates. Errors still alert.
+            setLeaveTo('logs');
+            onDelete().catch(() => {});
+          },
+        },
+      ],
+    );
   };
 
   const clear = (k: keyof Errors) =>
     errors[k] && setErrors((p) => ({ ...p, [k]: undefined }));
-  const uploadPhoto = async () => {
+  // Picked photos are held locally until Save log.
+  const pickPhoto = async () => {
     const uri = await pickImage();
-    if (uri) addPhoto.mutate({ catId: cat.catId, uri, takenOn: date });
+    if (uri) setPendingAdds((prev) => [...prev, uri]);
+  };
+  const removePhoto = (photo: CatPhoto) => {
+    if (photo.photoId.startsWith('local-')) {
+      const i = Number(photo.photoId.slice('local-'.length));
+      setPendingAdds((prev) => prev.filter((_, j) => j !== i));
+    } else {
+      setPendingDeletes((prev) => [...prev, photo.photoId]);
+    }
+    setViewing(null);
   };
 
   return (
@@ -658,7 +801,7 @@ export function LogForm({
           />
         </View>
 
-        {/* Photos — uploaded straight away into the cat's album, dated this day.
+        {/* Photos — added to the cat's album (dated this day) when the log is saved.
             One grid for the photos and the Add tile, so the Add tile is the same size with or without photos. */}
         <View className="gap-2.5">
           <SectionHeader title="Photos" />
@@ -667,8 +810,7 @@ export function LogForm({
             columns={4}
             gap={8}
             onPress={(_, i) => setViewing(i)}
-            onAdd={uploadPhoto}
-            adding={addPhoto.isPending}
+            onAdd={pickPhoto}
           />
         </View>
 
@@ -690,10 +832,14 @@ export function LogForm({
           />
         </View>
 
-        <Button title="Save log" onPress={submit} loading={submitting} />
+        <Button
+          title="Save log"
+          onPress={submit}
+          loading={submitting || savingPhotos}
+        />
         {onDelete && (
           <Pressable
-            onPress={onDelete}
+            onPress={confirmDelete}
             accessibilityRole="button"
             className="self-center h-11 justify-center -mt-3"
           >
@@ -708,12 +854,8 @@ export function LogForm({
         photos={photos}
         index={viewing}
         onClose={() => setViewing(null)}
-        onDelete={(p) =>
-          deletePhoto.mutate(
-            { catId: p.catId, photoId: p.photoId },
-            { onSuccess: () => setViewing(null) },
-          )
-        }
+        onDelete={removePhoto}
+        deleteMessage="It will be removed when you save this log."
       />
     </KeyboardAvoidingView>
   );
