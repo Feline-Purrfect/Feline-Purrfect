@@ -10,6 +10,7 @@ export const catKeys = {
   archived: ['cats', 'list', 'archived'] as const,
   detail: (catId: string) => ['cats', 'detail', catId] as const,
   photos: (catId: string) => ['cats', 'photos', catId] as const,
+  photosOn: (catId: string, date: string) => ['cats', 'photos', catId, date] as const,
   recentPhotos: ['cats', 'photos', 'recent'] as const,
 };
 
@@ -57,6 +58,15 @@ export function useCatPhotos(catId: string) {
     queryKey: catKeys.photos(catId),
     queryFn: () => catsApi.getCatPhotos(catId),
     enabled: !!catId,
+  });
+}
+
+/** One cat's photos from one day (shown on that day's log). */
+export function useCatPhotosOn(catId: string, date: string) {
+  return useQuery({
+    queryKey: catKeys.photosOn(catId, date),
+    queryFn: async () => (await catsApi.getCatPhotos(catId, { on: date, limit: 12 })).photos,
+    enabled: !!catId && !!date,
   });
 }
 

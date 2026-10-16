@@ -59,6 +59,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <LogsIcon name="analytics-sharp" color={color} size={size} />
             ),
+            headerShown: false, // the screen draws its own large title and week strip
           }}
         />
         <Tabs.Screen

@@ -68,6 +68,7 @@ module.exports = {
           DEFAULT: '#E8E3DA', // card borders, tab bar top border
           strong: '#DCD6CB',  // input & secondary-button borders
           soft: '#F0ECE5',    // dividers inside a card
+          dot: '#C9C2B6',     // "partly logged" dot on the week strip
         },
 
         // Attention: a symptom or change worth a look. Not an error.

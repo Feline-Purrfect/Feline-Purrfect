@@ -85,7 +85,7 @@ async function logSummaries(userId, catIds) {
   const since = plusDays(todayUtc(), -14);
   const { data, error } = await admin
     .from('logs')
-    .select('cat_id,log_date,vomiting,diarrhea,appetite,energy')
+    .select('cat_id,log_date,symptoms,appetite,energy')
     .eq('user_id', userId)
     .gte('log_date', since)
     .order('log_date', { ascending: false });
@@ -96,8 +96,8 @@ async function logSummaries(userId, catIds) {
     if (out.has(l.cat_id)) continue; // rows are newest-first; first one wins
     let attention = null;
     if (l.log_date >= recent) {
-      if (l.vomiting) attention = 'Vomiting';
-      else if (l.diarrhea) attention = 'Diarrhea';
+      const first = Array.isArray(l.symptoms) ? l.symptoms[0] : null;
+      if (first?.name) attention = first.count > 1 ? `${first.name} ×${first.count}` : first.name;
       else if (l.appetite != null && l.appetite <= 2) attention = 'Eating less';
       else if (l.energy != null && l.energy <= 2) attention = 'Low energy';
     }
@@ -279,8 +279,12 @@ router.get('/:id/photos', async (req, res) => {
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 200);
   const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
-  const { data, error, count } = await admin.from('cat_photos').select('*', { count: 'exact' })
-    .eq('cat_id', cat.cat_id).eq('user_id', req.user.id)
+  // ?on=YYYY-MM-DD → only photos from that day (shown on that day's log)
+  const on = typeof req.query.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.on) ? req.query.on : null;
+
+  let q = admin.from('cat_photos').select('*', { count: 'exact' }).eq('cat_id', cat.cat_id).eq('user_id', req.user.id);
+  if (on) q = q.eq('taken_on', on);
+  const { data, error, count } = await q
     .order('taken_on', { ascending: false }).order('created_at', { ascending: false })
     .range(offset, offset + limit - 1);
   if (error) throw error;

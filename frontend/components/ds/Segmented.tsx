@@ -6,6 +6,8 @@ interface SegmentedProps<T extends string> {
   value: T | null; // null = nothing chosen yet (e.g. sex on a new cat)
   onChange: (value: T) => void;
   accessibilityLabel: string;
+  /** `md` (40px, 15pt) for forms; `sm` (38px, 14pt) inside dense log rows. */
+  size?: 'md' | 'sm';
   className?: string;
 }
 
@@ -17,7 +19,7 @@ const thumbShadow = {
   elevation: 1,
 };
 
-export function Segmented<T extends string>({ options, value, onChange, accessibilityLabel, className }: SegmentedProps<T>) {
+export function Segmented<T extends string>({ options, value, onChange, accessibilityLabel, size = 'md', className }: SegmentedProps<T>) {
   return (
     <View
       accessibilityRole="radiogroup"
@@ -32,10 +34,10 @@ export function Segmented<T extends string>({ options, value, onChange, accessib
             accessibilityRole="radio"
             accessibilityState={{ checked: on }}
             onPress={() => onChange(o.value)}
-            className={cn('flex-1 h-10 rounded-seg items-center justify-center', on && 'bg-surface')}
+            className={cn('flex-1 rounded-seg items-center justify-center px-1', size === 'sm' ? 'h-[38px]' : 'h-10', on && 'bg-surface')}
             style={on ? thumbShadow : undefined}
           >
-            <Text className={cn('text-body', on ? 'font-body-bold text-ink' : 'font-body-semibold text-ink-muted')}>{o.label}</Text>
+            <Text numberOfLines={1} className={cn(size === 'sm' ? 'text-label' : 'text-body', on ? 'font-body-bold text-ink' : 'font-body-semibold text-ink-muted')}>{o.label}</Text>
           </Pressable>
         );
       })}

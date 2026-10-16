@@ -12,8 +12,8 @@ import { useLogs } from '@/hooks/useLogs';
 import { formatWeight, maskMicrochip, profileMeta } from '@/lib/cats';
 import { cn } from '@/lib/cn';
 import { formatLongDate, formatMonth, formatShortDay } from '@/lib/dates';
+import { formatAmount, summarizeLog } from '@/lib/logs';
 import { CatPhoto, CatResponse } from '@/types/cat';
-import { LogResponse } from '@/types/log';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
@@ -153,8 +153,8 @@ function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading
   const stats = analytics?.analysis.find((a) => a.catId === cat.catId);
 
   const details: { label: string; value: string; onPress?: () => void; hint?: string }[] = [
-    { label: 'Birthday', value: `${formatLongDate(cat.birthDate)}${cat.birthDateEstimated ? ' (est.)' : ''}` },
-    { label: 'Adopted', value: formatLongDate(cat.adoptedDate) },
+    { label: 'Birthday', value: cat.birthDate ? `${formatLongDate(cat.birthDate)}${cat.birthDateEstimated ? ' (est.)' : ''}` : 'Not set' },
+    { label: 'Adopted', value: cat.adoptedDate ? formatLongDate(cat.adoptedDate) : 'Not set' },
   ];
   if (cat.microchipId) {
     details.push({
@@ -167,7 +167,7 @@ function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading
 
   return (
     <View className="gap-5">
-      {/* Averages from the last 30 logs. Food/water are counts until logs record grams/ml. */}
+      {/* Averages from the last 30 logs, in the unit the cat was most recently logged in. */}
       <Pressable
         accessibilityRole="button"
         accessibilityHint="Opens detailed analytics"
@@ -175,8 +175,8 @@ function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading
         className="bg-surface border border-line rounded-card p-4 flex-row gap-2 active:opacity-90"
       >
         <Stat label="Weight" value={formatWeight(cat.weight, cat.weightUnit) ?? '—'} />
-        <Stat label="Meals / day" value={stats?.averageFoodCount ?? '—'} />
-        <Stat label="Water / day" value={stats?.averageWaterCount ?? '—'} />
+        <Stat label="Food / day" value={formatAmount(stats?.averageFood ? Number(stats.averageFood.amount) : null, stats?.averageFood?.unit) ?? '—'} />
+        <Stat label="Water / day" value={formatAmount(stats?.averageWater ? Number(stats.averageWater.amount) : null, stats?.averageWater?.unit) ?? '—'} />
       </Pressable>
 
       <View className="gap-2.5">
@@ -230,18 +230,6 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 // ------------------------------------------------------------------ Records tab
-function summarize(log: LogResponse): string {
-  const parts: string[] = [];
-  if (log.vomiting) parts.push('Vomiting');
-  if (log.diarrhea) parts.push('Diarrhea');
-  if (log.appetite != null && log.appetite <= 2) parts.push('Low appetite');
-  if (log.foodCount) parts.push(`${log.foodCount} ${log.foodCount === 1 ? 'meal' : 'meals'}`);
-  if (log.waterCount) parts.push(`${log.waterCount} water`);
-  if (log.temperature) parts.push(`${log.temperature} °C`);
-  if (log.weight) parts.push(`${log.weight} kg`);
-  return parts.length ? parts.join(' · ') : 'Logged';
-}
-
 function Records({ catId }: { catId: string }) {
   const { data: logs = [], isLoading, error } = useLogs(catId);
   if (isLoading) return <ActivityIndicator color={Colors.primary.DEFAULT} className="py-8" />;
@@ -261,7 +249,7 @@ function Records({ catId }: { catId: string }) {
               className="flex-row items-center gap-3 px-4 py-3.5 active:bg-fill"
             >
               <Text variant="label" className="w-16 font-body-bold">{formatShortDay(log.date)}</Text>
-              <Text variant="label" className="flex-1 font-body text-ink-soft" numberOfLines={2}>{summarize(log)}</Text>
+              <Text variant="label" className="flex-1 font-body text-ink-soft" numberOfLines={2}>{summarizeLog(log)}</Text>
             </Pressable>
           </Fragment>
         ))}

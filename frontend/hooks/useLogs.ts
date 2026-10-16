@@ -1,90 +1,74 @@
 import { logsApi } from '@/api/logs';
-import { LogResponse } from '@/types/log';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Alert } from 'react-native';
 
-const LOGS_QUERY_KEY = ['logs'];
+export const logKeys = {
+  all: ['logs'] as const,
+  list: (catId?: string) => ['logs', 'list', catId ?? 'all'] as const,
+  range: (from: string, to: string) => ['logs', 'range', from, to] as const,
+  detail: (id: string) => ['logs', 'detail', id] as const,
+};
 
-// Get all logs or logs by catId
+/** All logs, or one cat's (newest first). */
 export function useLogs(catId?: string) {
   return useQuery({
-    queryKey: catId ? ['logs', catId] : ['logs'],
-    queryFn: () => logsApi.getLogs(catId),
+    queryKey: logKeys.list(catId),
+    queryFn: () => logsApi.getLogs({ catId }),
   });
 }
 
-// Add a log
-export function useAddLog() {
+/** Every cat's logs between two dates (inclusive), e.g. the visible week or month. */
+export function useLogsRange(from: string, to: string) {
+  return useQuery({
+    queryKey: logKeys.range(from, to),
+    queryFn: () => logsApi.getLogs({ from, to }),
+    placeholderData: (previous) => previous, // keep the old month visible while the next one loads
+  });
+}
+
+export function useLog(id: string) {
+  return useQuery({
+    queryKey: logKeys.detail(id),
+    queryFn: () => logsApi.getLog(id),
+    enabled: !!id,
+    retry: (count, err: any) => err?.status !== 404 && count < 1,
+  });
+}
+
+/** Saving a log changes the cat card status, the cat's weight and the dashboard. */
+function useInvalidateAfterLog() {
   const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: logsApi.addLog,
-    onSuccess: (newLog) => {
-      queryClient.setQueryData<LogResponse[]>(LOGS_QUERY_KEY, (old = []) => [
-        ...old,
-        newLog,
-      ]);
-
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-    },
-  });
+  return () => {
+    queryClient.invalidateQueries({ queryKey: logKeys.all });
+    queryClient.invalidateQueries({ queryKey: ['cats'] });
+    queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
+  };
 }
 
-// Update a log
+const showError = (title: string) => (error: any) => Alert.alert(title, error?.message || 'Please try again.');
+
+export function useSaveLog() {
+  const invalidate = useInvalidateAfterLog();
+  return useMutation({ mutationFn: logsApi.saveLog, onSuccess: invalidate, onError: showError('Couldn’t save this log') });
+}
+
 export function useUpdateLog() {
-  const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: logsApi.updateLog,
-    onMutate: async (updatedLog) => {
-      await queryClient.cancelQueries({ queryKey: LOGS_QUERY_KEY });
-      const previousLogs = queryClient.getQueryData<LogResponse[]>(LOGS_QUERY_KEY);
-      
-      queryClient.setQueryData<LogResponse[]>(LOGS_QUERY_KEY, (old = []) =>
-        old.map(log => log.id === updatedLog.id ? updatedLog : log)
-      );
-      
-      return { previousLogs };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-    },
-    onError: (err, updatedLog, context) => {
-      if (context?.previousLogs) {
-        queryClient.setQueryData(LOGS_QUERY_KEY, context.previousLogs);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: LOGS_QUERY_KEY });
-    },
-  });
+  const invalidate = useInvalidateAfterLog();
+  return useMutation({ mutationFn: logsApi.updateLog, onSuccess: invalidate, onError: showError('Couldn’t save this log') });
 }
 
-// Delete a log
 export function useDeleteLog() {
   const queryClient = useQueryClient();
-  
+  const invalidate = useInvalidateAfterLog();
   return useMutation({
     mutationFn: logsApi.deleteLog,
-    onMutate: async (deletedId) => {
-      await queryClient.cancelQueries({ queryKey: LOGS_QUERY_KEY });
-      const previousLogs = queryClient.getQueryData<LogResponse[]>(LOGS_QUERY_KEY);
-      
-      queryClient.setQueryData<LogResponse[]>(LOGS_QUERY_KEY, (old = []) =>
-        old.filter(log => log.id !== deletedId)
-      );
-      
-      return { previousLogs };
+    onSuccess: (_, id) => {
+      queryClient.removeQueries({ queryKey: logKeys.detail(id) });
+      invalidate();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-    },
-    onError: (err, deletedId, context) => {
-      if (context?.previousLogs) {
-        queryClient.setQueryData(LOGS_QUERY_KEY, context.previousLogs);
-      }
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: LOGS_QUERY_KEY });
-    },
+    onError: showError('Couldn’t delete this log'),
   });
 }
+
+/** @deprecated kept for screens not yet moved to useSaveLog. */
+export const useAddLog = useSaveLog;

@@ -24,7 +24,9 @@ export const Colors = {
     muted: '#6B675F',
     faint: '#77726A',
   },
-  line: { DEFAULT: '#E8E3DA', strong: '#DCD6CB', soft: '#F0ECE5' },
+  line: { DEFAULT: '#E8E3DA', strong: '#DCD6CB', soft: '#F0ECE5', dot: '#C9C2B6' },
+  disabled: '#C4BEB3', // disabled icon (e.g. next-month arrow)
+  future: '#B5AFA4',   // future dates on the calendar
   attention: {
     DEFAULT: '#B4561F',
     text: '#9A4A12',

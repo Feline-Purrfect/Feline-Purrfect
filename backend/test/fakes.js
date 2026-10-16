@@ -17,6 +17,7 @@ function createDb() {
     is(col, val) { this.filters.push((r) => (val === null ? r[col] == null : r[col] === val)); return this; }
     not(col, op, val) { if (op !== 'is') throw new Error('fake: only not(col, "is", …)'); this.filters.push((r) => (val === null ? r[col] != null : r[col] !== val)); return this; }
     gte(col, val) { this.filters.push((r) => r[col] >= val); return this; }
+    lte(col, val) { this.filters.push((r) => r[col] <= val); return this; }
     range(from, to) { this.rng = [from, to]; return this; }
     order(col, { ascending = true } = {}) { this.orders.push({ col, ascending }); return this; }
     limit(n) { this.lim = n; return this; }

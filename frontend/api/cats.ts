@@ -81,8 +81,9 @@ export const catsApi = {
   },
 
   // ------------------------------------------------------------ photo gallery
-  getCatPhotos: async (catId: string, { limit = 60, offset = 0 } = {}): Promise<{ photos: CatPhoto[]; total: number }> =>
-    apiFetch(`/cats/${catId}/photos?limit=${limit}&offset=${offset}`, {
+  /** Newest first. `on` (YYYY-MM-DD) limits to one day, for that day's log. */
+  getCatPhotos: async (catId: string, { limit = 60, offset = 0, on }: { limit?: number; offset?: number; on?: string } = {}): Promise<{ photos: CatPhoto[]; total: number }> =>
+    apiFetch(`/cats/${catId}/photos?limit=${limit}&offset=${offset}${on ? `&on=${on}` : ''}`, {
       fallbackCode: 'GetPhotosError',
       fallbackMessage: 'Couldn’t load photos',
     }),

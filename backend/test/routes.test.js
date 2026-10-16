@@ -126,10 +126,10 @@ test('cats: archive hides the cat from My cats, lists it under ?archived=true, u
 
 test('cats: list carries lastLogDate + attention from the latest log', async () => {
   const { catId } = (await call(cats, 'POST', '/', { body: catBody() })).body.cat;
-  db.tables.logs.push({ cat_id: catId, user_id: USER_A, log_date: today(), vomiting: true, appetite: 4 });
+  db.tables.logs.push({ cat_id: catId, user_id: USER_A, log_date: today(), symptoms: [{ name: 'Vomiting', count: 2 }], appetite: 4 });
   const c = (await call(cats, 'GET', '/')).body.cats[0];
   assert.equal(c.lastLogDate, today());
-  assert.equal(c.attention, 'Vomiting');
+  assert.equal(c.attention, 'Vomiting ×2');
 });
 
 test('cats: delete removes the profile photo and every gallery photo file', async () => {
@@ -155,6 +155,9 @@ test('photos: add, list newest-first with total, recent across cats, delete', as
   const list = await call(cats, 'GET', '/:id/photos', { params: { id: mochi }, query: { limit: '1' } });
   assert.equal(list.body.total, 2);
   assert.deepEqual(list.body.photos.map((p) => p.takenOn), ['2026-03-04']);
+
+  const onDay = await call(cats, 'GET', '/:id/photos', { params: { id: mochi }, query: { on: '2026-01-02' } });
+  assert.deepEqual(onDay.body.photos.map((p) => p.takenOn), ['2026-01-02']);
 
   const recent = await call(cats, 'GET', '/photos/recent');
   assert.deepEqual(recent.body.photos.map((p) => `${p.catName} ${p.takenOn}`), ['Mochi 2026-03-04', 'Tofu 2026-02-03', 'Mochi 2026-01-02']);
@@ -243,6 +246,85 @@ test('logs: out-of-range values are rejected', async () => {
   const catId = await makeCat();
   assert.equal((await call(logs, 'POST', '/', { body: { catId, date: '2025-12-14', pooCount: -1 } })).status, 400);
   assert.equal((await call(logs, 'POST', '/', { body: { catId, date: 'yesterday' } })).status, 400);
+});
+
+// ---------------------------------------------------------------- logs: redesign fields
+test('logs: amounts with units, symptoms, teeth, medication; complete flag', async () => {
+  const catId = await makeCat();
+  const r = await call(logs, 'POST', '/', { body: {
+    catId, date: '2026-10-13',
+    foodAmount: 184, foodUnit: 'g', waterAmount: 220, waterUnit: 'ml', pooCount: 1, peeCount: 3,
+    symptoms: [{ name: 'Sneezing', count: 3 }, { name: 'sneezing' }, { name: 'Watery eyes' }],
+    teethBrushed: true,
+    medications: [{ name: 'Probiotic', dose: 1, unit: 'pill' }],
+    temperature: 38.6, notes: '  Fine.  ',
+  } });
+  assert.equal(r.status, 201);
+  const l = r.body.log;
+  assert.equal(l.complete, true);
+  assert.equal(l.foodAmount, 184);
+  assert.equal(l.foodUnit, 'g');
+  assert.deepEqual(l.symptoms, [{ name: 'Sneezing', count: 4 }, { name: 'Watery eyes', count: 1 }]); // duplicates merged
+  assert.equal(l.teethBrushed, true);
+  assert.deepEqual(l.medications, [{ name: 'Probiotic', dose: 1, unit: 'pill' }]);
+  assert.equal(l.notes, 'Fine.');
+});
+
+test('logs: a symptom-only log is incomplete; amount without unit is rejected', async () => {
+  const catId = await makeCat();
+  const partial = await call(logs, 'POST', '/', { body: { catId, date: '2026-10-13', symptoms: [{ name: 'Vomiting', count: 2 }] } });
+  assert.equal(partial.body.log.complete, false);
+  assert.equal(partial.body.log.vomiting, true);
+  const bad = await call(logs, 'POST', '/', { body: { catId, date: '2026-10-13', foodAmount: 100 } });
+  assert.equal(bad.status, 400);
+  assert.match(bad.body.message, /food unit/);
+  assert.equal((await call(logs, 'POST', '/', { body: { catId, date: '2026-10-13', foodAmount: 1, foodUnit: 'buckets' } })).status, 400);
+});
+
+test('logs: PUT is partial — finishing a symptom-only log keeps the symptoms', async () => {
+  const catId = await makeCat();
+  const id = (await call(logs, 'POST', '/', { body: { catId, date: '2026-10-13', symptoms: [{ name: 'Vomiting', count: 2 }] } })).body.log.id;
+  const up = await call(logs, 'PUT', '/:id', { params: { id }, body: { foodAmount: 0.5, foodUnit: 'cups', waterAmount: 1, waterUnit: 'bowls' } });
+  assert.equal(up.body.log.complete, true);
+  assert.deepEqual(up.body.log.symptoms, [{ name: 'Vomiting', count: 2 }]);
+  // removing the symptom clears the derived flag too
+  const cleared = await call(logs, 'PUT', '/:id', { params: { id }, body: { symptoms: [] } });
+  assert.equal(cleared.body.log.vomiting, false);
+});
+
+test('logs: legacy counts/flags from old app builds are translated', async () => {
+  const catId = await makeCat();
+  const r = await call(logs, 'POST', '/', { body: { catId, date: '2026-10-13', foodCount: 3, waterCount: 2, vomiting: true } });
+  assert.equal(r.body.log.foodAmount, 3);
+  assert.equal(r.body.log.foodUnit, 'portions');
+  assert.equal(r.body.log.waterUnit, 'bowls');
+  assert.deepEqual(r.body.log.symptoms, [{ name: 'Vomiting', count: 1 }]);
+});
+
+test('logs: from/to range filter', async () => {
+  const catId = await makeCat();
+  for (const d of ['2026-09-30', '2026-10-01', '2026-10-31', '2026-11-01']) await call(logs, 'POST', '/', { body: { catId, date: d } });
+  const r = await call(logs, 'GET', '/', { query: { from: '2026-10-01', to: '2026-10-31' } });
+  assert.deepEqual(r.body.logs.map((l) => l.date), ['2026-10-31', '2026-10-01']);
+  assert.equal((await call(logs, 'GET', '/', { query: { from: 'nope' } })).status, 400);
+});
+
+test('logs: weight on the most recent weighed day updates the cat; an older one does not', async () => {
+  const catId = await makeCat();
+  await call(logs, 'POST', '/', { body: { catId, date: '2026-10-10', weight: 4.5 } });
+  assert.equal(db.tables.cats[0].weight, 4.5);
+  await call(logs, 'POST', '/', { body: { catId, date: '2026-10-01', weight: 4.0 } });
+  assert.equal(db.tables.cats[0].weight, 4.5);
+});
+
+test('dashboard: food/water averaged in the latest unit', async () => {
+  const catId = await makeCat();
+  await call(logs, 'POST', '/', { body: { catId, date: '2026-10-01', foodAmount: 2, foodUnit: 'portions', waterAmount: 1, waterUnit: 'bowls' } });
+  await call(logs, 'POST', '/', { body: { catId, date: '2026-10-02', foodAmount: 120, foodUnit: 'g', waterAmount: 200, waterUnit: 'ml' } });
+  await call(logs, 'POST', '/', { body: { catId, date: '2026-10-03', foodAmount: 151, foodUnit: 'g', waterAmount: 191, waterUnit: 'ml' } });
+  const a = (await call(dashboard, 'GET', '/analytics')).body.analysis[0];
+  assert.deepEqual(a.averageFood, { amount: '136', unit: 'g' });
+  assert.deepEqual(a.averageWater, { amount: '196', unit: 'ml' });
 });
 
 // ---------------------------------------------------------------- dashboard

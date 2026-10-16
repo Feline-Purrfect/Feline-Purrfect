@@ -1,181 +1,115 @@
-import { CustomButton } from '@/components/common/CustomButton';
 import { ErrorView } from '@/components/common/ErrorView';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
-import { DateNavigator } from '@/components/ui/DateNavigator';
-import { AddLogCard, LogCard } from '@/components/ui/LogCard';
+import { Button, Text } from '@/components/ds';
+import { CalendarSheet } from '@/components/logs/CalendarSheet';
+import { CompleteLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
+import { WeekStrip } from '@/components/logs/WeekStrip';
 import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
-import { useLogs } from '@/hooks/useLogs';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { router } from 'expo-router';
-import { useState } from 'react';
-import { Image, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useLogsRange } from '@/hooks/useLogs';
+import { fromYmd, todayYmd } from '@/lib/dates';
+import { addDays, dayStatus, weekEnding } from '@/lib/logs';
+import Feather from '@expo/vector-icons/Feather';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useState } from 'react';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const MONTH = new Intl.DateTimeFormat('en-US', { month: 'long' });
 
 export default function LogsScreen() {
-  const { data: logs = [], isLoading: logsLoading, error: logsError } = useLogs();
-  const { data: cats = [], isLoading: catsLoading } = useCats();
-  const [selectedCatId, setSelectedCatId] = useState<string | 'all'>('all');
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const insets = useSafeAreaInsets();
+  const [today, setToday] = useState(todayYmd);
+  const [selected, setSelected] = useState(today);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
-  const isLoading = logsLoading || catsLoading;
+  // The app can stay open past midnight; re-read "today" whenever the tab is focused.
+  useFocusEffect(useCallback(() => {
+    const t = todayYmd();
+    setToday((prev) => {
+      if (prev !== t) setSelected((s) => (s === prev ? t : s));
+      return t;
+    });
+  }, []));
 
-  // Format date to YYYY-MM-DD for comparison
-  const formatDate = (date: Date) => {
-    return date.toISOString().split('T')[0];
-  };
+  // The strip shows the last 7 days; picking an older day from the calendar shows the week ending there.
+  const stripEnd = selected >= addDays(today, -6) ? today : selected;
+  const days = weekEnding(stripEnd);
 
-  const selectedDateString = formatDate(selectedDate);
+  const cats = useCats();
+  const week = useLogsRange(days[0], days[6]);
 
-  if (isLoading) {
-    return <LoadingIndicator />;
-  }
+  if (cats.isLoading) return <LoadingIndicator />;
+  if (cats.error && !cats.data) return <ErrorView message={(cats.error as any)?.message} onRetry={() => cats.refetch()} />;
 
-  if (logsError) {
-    return <ErrorView message="Error loading logs" />;
-  }
-
-  // Get cats to display based on selected filter
-  const displayCats = selectedCatId === 'all' ? cats : cats.filter(c => c.catId === selectedCatId);
-
-  // Get logs for selected date
-  const logsForDate = logs.filter(log => log.date === selectedDateString);
+  const catList = cats.data ?? [];
+  const catIds = catList.map((c) => c.catId);
+  const logs = week.data ?? [];
+  const isToday = selected === today;
+  const dayLogs = logs.filter((l) => l.date === selected);
 
   return (
-    <View className="flex-1 bg-white">
-      {/* Date Navigator */}
-      <DateNavigator 
-        selectedDate={selectedDate}
-        onDateChange={setSelectedDate}
-      />
-      
-      {/* Cat Tabs */}
-      <View className="bg-white border-b border-gray-200">
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          className="px-6 py-3"
-        >
-          <View className="flex-row gap-2">
-            {/* All Cats Tab */}
-            <TouchableOpacity
-              onPress={() => setSelectedCatId('all')}
-              className={`px-4 py-2 rounded-full flex-row items-center ${
-                selectedCatId === 'all' 
-                  ? 'bg-primary-600' 
-                  : 'bg-gray-100'
-              }`}
-            >
-              <FontAwesome6 
-                name="cat" 
-                size={16} 
-                color={selectedCatId === 'all' ? 'white' : Colors.gray.DEFAULT} 
-              />
-              <Text className={`ml-2 font-semibold ${
-                selectedCatId === 'all' 
-                  ? 'text-white' 
-                  : 'text-gray-600'
-              }`}>
-                All Cats
-              </Text>
-            </TouchableOpacity>
-
-            {/* Individual Cat Tabs */}
-            {cats.map(cat => {
-              const catLogCount = logsForDate.filter(log => log.catId === cat.catId).length;
-              const isSelected = selectedCatId === cat.catId;
-              
-              return (
-                <TouchableOpacity
-                  key={cat.catId}
-                  onPress={() => setSelectedCatId(cat.catId)}
-                  className={`px-4 py-2 rounded-full flex-row items-center ${
-                    isSelected ? 'bg-primary-600' : 'bg-gray-100'
-                  }`}
-                >
-                  {cat.photoUrl ? (
-                    <Image 
-                      source={{ uri: cat.photoUrl }} 
-                      className="w-6 h-6 rounded-full mr-2"
-                    />
-                  ) : (
-                    <View className="w-6 h-6 rounded-full bg-primary-200 items-center justify-center mr-2">
-                      <FontAwesome6 name="cat" size={12} color={Colors.primary.DEFAULT} />
-                    </View>
-                  )}
-                  <Text className={`font-semibold ${
-                    isSelected ? 'text-white' : 'text-gray-600'
-                  }`}>
-                    {cat.name}
-                  </Text>
-                  {catLogCount > 0 && (
-                    <View className={`ml-2 w-5 h-5 rounded-full items-center justify-center ${
-                      isSelected ? 'bg-white' : 'bg-gray-200'
-                    }`}>
-                      <Text className={`text-xs font-bold ${
-                        isSelected ? 'text-primary-600' : 'text-gray-600'
-                      }`}>
-                        {catLogCount}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        </ScrollView>
+    <View className="flex-1 bg-canvas">
+      <View className="px-5 gap-3.5" style={{ paddingTop: insets.top + 14 }}>
+        <View className="flex-row items-center justify-between">
+          <Text variant="title" accessibilityRole="header">Logs</Text>
+          <Pressable
+            onPress={() => setCalendarOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`Open calendar, ${MONTH.format(fromYmd(selected))}`}
+            className="h-11 px-3.5 rounded-full border border-line bg-surface flex-row items-center gap-2 active:bg-fill"
+          >
+            <Feather name="calendar" size={16} color={Colors.ink.DEFAULT} />
+            <Text variant="label">{MONTH.format(fromYmd(selected))}</Text>
+          </Pressable>
+        </View>
+        <WeekStrip days={days} selected={selected} onSelect={setSelected} statusFor={(d) => dayStatus(logs, d, catIds).status} />
       </View>
 
-      {/* Logs List */}
-      <ScrollView className="flex-1 px-6 pt-6">
-        {cats.length === 0 ? (
-          <View className="items-center justify-center py-20">
-            <View className="w-32 h-32 bg-primary-200 rounded-full items-center justify-center mb-4">
-              <FontAwesome6 name="cat" size={64} color={Colors.primary[500]} />
-            </View>
-            <Text className="text-gray-800 text-xl font-bold mb-2">
-              No cats yet
-            </Text>
-            <Text className="text-gray-500 text-center mb-6">
-              Add a cat first to start logging
-            </Text>
-            <CustomButton
-              content="Add Your First Cat"
-              onPress={() => router.push('/my-cats/create')}
-              className='px-8 py-3'
-              textClassName='font-semibold'
-            />
-          </View>
-        ) : (
-          displayCats.map(cat => {
-            // Find log for this cat on selected date
-            const existingLog = logsForDate.find(log => log.catId === cat.catId);
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ padding: 20, gap: 14 }}
+        refreshControl={<RefreshControl refreshing={week.isRefetching} onRefresh={() => week.refetch()} tintColor={Colors.primary.DEFAULT} />}
+      >
+        <Text variant="label" className="text-ink-muted">
+          {isToday ? `Today · ${LONG.format(fromYmd(selected))}` : LONG.format(fromYmd(selected))}
+        </Text>
 
-            if (existingLog) {
-              // Show existing log
-              return (
-                <LogCard
-                  key={cat.catId}
-                  log={existingLog}
-                  cat={cat}
-                  onPress={() => router.push(`/logs/${existingLog.id}`)}
-                />
+        {catList.length === 0 ? (
+          <View className="bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
+            <Text variant="card" className="text-center">No cats to log yet</Text>
+            <Text variant="caption" className="text-center text-body">Add a cat first, then log their food, water and litter here each day.</Text>
+            <Button title="Add cat" onPress={() => router.push('/my-cats/create')} className="self-stretch mt-2" />
+          </View>
+        ) : week.isLoading ? (
+          <LoadingIndicator />
+        ) : week.error ? (
+          <Text variant="body" className="text-danger">{(week.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to try again.</Text>
+        ) : (
+          // Finished logs first, then the ones still to do.
+          [...catList]
+            .sort((a, b) => Number(!dayLogs.find((l) => l.catId === a.catId)?.complete) - Number(!dayLogs.find((l) => l.catId === b.catId)?.complete))
+            .map((cat) => {
+              const log = dayLogs.find((l) => l.catId === cat.catId) ?? null;
+              return log?.complete ? (
+                <CompleteLogCard key={cat.catId} cat={cat} log={log} onPress={() => router.push(`/logs/${log.id}`)} />
+              ) : (
+                <PendingLogCard key={cat.catId} cat={cat} log={log} date={selected} isToday={isToday} />
               );
-            } else {
-              // Show add log card
-              return (
-                <AddLogCard
-                  key={cat.catId}
-                  cat={cat}
-                  onPress={() => router.push({
-                    pathname: '/logs/[id]/create',
-                    params: { id: cat.catId, date: selectedDateString },
-                  })}
-                />
-              );
-            }
-          })
+            })
         )}
       </ScrollView>
+
+      <CalendarSheet
+        // remount on open so the month starts at the selected day
+        key={calendarOpen ? `open-${selected}` : 'closed'}
+        visible={calendarOpen}
+        selected={selected}
+        cats={catList}
+        onSelect={setSelected}
+        onClose={() => setCalendarOpen(false)}
+      />
     </View>
   );
 }

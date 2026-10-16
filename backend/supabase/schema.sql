@@ -54,24 +54,40 @@ create index if not exists cat_photos_user_idx on public.cat_photos (user_id, ta
 -- ---------------------------------------------------------------- logs
 -- One row per cat per day (same as the DynamoDB catId + date key).
 create table if not exists public.logs (
-  cat_id       uuid not null references public.cats(cat_id) on delete cascade,
-  log_date     date not null,
-  user_id      uuid not null references auth.users(id) on delete cascade,
-  poo_count    integer not null default 0 check (poo_count   between 0 and 1000),
-  pee_count    integer not null default 0 check (pee_count   between 0 and 1000),
-  food_count   integer not null default 0 check (food_count  between 0 and 1000),
-  water_count  integer not null default 0 check (water_count between 0 and 1000),
-  weight       double precision,
-  temperature  double precision,
-  notes        text,
-  -- optional fields the old dashboard-analytics Lambda already read but nothing ever wrote
-  appetite     smallint check (appetite between 1 and 5),
-  energy       smallint check (energy   between 1 and 5),
-  vomiting     boolean,
-  diarrhea     boolean,
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now(),
-  primary key (cat_id, log_date)
+  cat_id         uuid not null references public.cats(cat_id) on delete cascade,
+  log_date       date not null,
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  -- daily essentials (a log is "complete" once food and water are filled in)
+  food_amount    numeric(7,2),
+  food_unit      text,
+  water_amount   numeric(7,2),
+  water_unit     text,
+  poo_count      integer not null default 0 check (poo_count between 0 and 1000),
+  pee_count      integer not null default 0 check (pee_count between 0 and 1000),
+  -- optional
+  symptoms       jsonb not null default '[]'::jsonb,   -- [{ "name": "Vomiting", "count": 2 }]
+  teeth_brushed  boolean,
+  medications    jsonb not null default '[]'::jsonb,   -- [{ "name": "Probiotic", "dose": 1, "unit": "pill" }]
+  weight         double precision,                     -- kg
+  temperature    double precision,                     -- °C
+  notes          text,
+  -- deprecated (kept for old rows / rollback)
+  food_count     integer not null default 0,
+  water_count    integer not null default 0,
+  appetite       smallint check (appetite between 1 and 5),
+  energy         smallint check (energy   between 1 and 5),
+  vomiting       boolean,
+  diarrhea       boolean,
+  created_at     timestamptz not null default now(),
+  updated_at     timestamptz not null default now(),
+  primary key (cat_id, log_date),
+  constraint logs_food_check check (
+    (food_amount is null and food_unit is null) or
+    (food_amount between 0 and 5000 and food_unit in ('g','cups','portions'))),
+  constraint logs_water_check check (
+    (water_amount is null and water_unit is null) or
+    (water_amount between 0 and 10000 and water_unit in ('ml','bowls'))),
+  constraint logs_json_check check (jsonb_typeof(symptoms) = 'array' and jsonb_typeof(medications) = 'array')
 );
 create index if not exists logs_user_date_idx on public.logs (user_id, log_date desc);
 create index if not exists logs_date_idx      on public.logs (log_date);
@@ -121,7 +137,9 @@ language sql stable security definer set search_path = public as $$
   from active a
   join totals t on t.user_id = a.user_id
   where not exists (
-    select 1 from public.logs l where l.cat_id = a.cat_id and l.log_date = day
+    select 1 from public.logs l
+    where l.cat_id = a.cat_id and l.log_date = day
+      and l.food_amount is not null and l.water_amount is not null
   )
   order by a.user_id, a.created_at;
 $$;

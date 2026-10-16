@@ -59,25 +59,42 @@ function toPhoto(row, url, catName) {
 
 const logId = (catId, date) => `${catId}_${date}`;
 
+const num = (v) => (v == null ? null : Number(v));
+const hasSymptom = (symptoms, name) => symptoms.some((x) => x.name?.toLowerCase() === name);
+
 function toLog(row) {
-  const id = logId(row.cat_id, row.log_date);
+  const id = logId(row.cat_id, dateOnly(row.log_date));
+  const symptoms = Array.isArray(row.symptoms) ? row.symptoms : [];
+  const foodAmount = num(row.food_amount);
+  const waterAmount = num(row.water_amount);
   return {
     id,
     logId: id,
     catId: row.cat_id,
     userId: row.user_id,
-    date: row.log_date,
-    pooCount: row.poo_count,
-    peeCount: row.pee_count,
-    foodCount: row.food_count,
-    waterCount: row.water_count,
+    date: dateOnly(row.log_date),
+    // daily essentials
+    foodAmount,
+    foodUnit: row.food_unit ?? null,
+    waterAmount,
+    waterUnit: row.water_unit ?? null,
+    pooCount: row.poo_count ?? 0,
+    peeCount: row.pee_count ?? 0,
+    complete: foodAmount != null && waterAmount != null,
+    // optional
+    symptoms,
+    teethBrushed: row.teeth_brushed ?? null,
+    medications: Array.isArray(row.medications) ? row.medications : [],
     weight: row.weight,
     temperature: row.temperature,
     notes: row.notes,
-    appetite: row.appetite,
-    energy: row.energy,
-    vomiting: row.vomiting,
-    diarrhea: row.diarrhea,
+    // derived / legacy, still read by analytics and older screens
+    vomiting: hasSymptom(symptoms, 'vomiting') || Boolean(row.vomiting),
+    diarrhea: hasSymptom(symptoms, 'diarrhea') || Boolean(row.diarrhea),
+    appetite: row.appetite ?? null,
+    energy: row.energy ?? null,
+    foodCount: row.food_count ?? 0,
+    waterCount: row.water_count ?? 0,
     createdAt: iso(row.created_at),
     updatedAt: iso(row.updated_at),
   };
