@@ -172,7 +172,7 @@ function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading
       <Pressable
         accessibilityRole="button"
         accessibilityHint="Opens detailed analytics"
-        onPress={() => router.push('/dashboard/analytics')}
+        onPress={() => router.push({ pathname: '/dashboard/analytics', params: { catId: cat.catId } })}
         className="bg-surface border border-line rounded-card p-4 flex-row gap-2 active:opacity-90"
       >
         <Stat label="Weight" value={formatWeight(cat.weight, cat.weightUnit) ?? '—'} />

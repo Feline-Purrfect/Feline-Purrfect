@@ -10,7 +10,7 @@ import { useLogsRange } from '@/hooks/useLogs';
 import { fromYmd, todayYmd } from '@/lib/dates';
 import { addDays, dayStatus } from '@/lib/logs';
 import Feather from '@expo/vector-icons/Feather';
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,6 +23,17 @@ export default function LogsScreen() {
   const [today, setToday] = useState(todayYmd);
   const [selected, setSelected] = useState(today);
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  // /logs?date=YYYY-MM-DD (e.g. from Home) jumps to that day. Handled once per new value, during
+  // render rather than in an effect, so the right day shows on the first frame.
+  // `at` makes each request unique, so tapping the same link again still jumps back.
+  const { date: dateParam, at } = useLocalSearchParams<{ date?: string; at?: string }>();
+  const requestKey = dateParam ? `${dateParam}|${at ?? ''}` : undefined;
+  const [handledParam, setHandledParam] = useState<string | undefined>(undefined);
+  if (requestKey !== handledParam) {
+    setHandledParam(requestKey);
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= todayYmd()) setSelected(dateParam);
+  }
 
   // The app can stay open past midnight; re-read "today" whenever the tab is focused.
   useFocusEffect(useCallback(() => {

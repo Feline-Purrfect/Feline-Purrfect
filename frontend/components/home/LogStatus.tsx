@@ -11,6 +11,11 @@ import { Pressable, View } from 'react-native';
 
 const MAX_PENDING_ROWS = 3;
 
+/** Logs tab on a given day. `at` makes each tap a new request, so it always jumps there. */
+function openLogsOn(date: string) {
+  router.push({ pathname: '/logs', params: { date, at: String(Date.now()) } });
+}
+
 /** "Mochi and Tofu logged", "Mochi, Tofu and 3 more logged". */
 function doneSummary(names: string[]) {
   if (names.length <= 2) return `${names.join(' and ')} logged`;
@@ -37,6 +42,13 @@ export function LogStatus({
   const shown = pending.slice(0, MAX_PENDING_ROWS);
   const extra = pending.length - shown.length;
   const pct = cats.length ? Math.round((done.length / cats.length) * 100) : 0;
+
+  // One finished cat → that log's detail. Several → the Logs tab, on today.
+  const openDone = () => {
+    const only = done.length === 1 ? logFor(done[0].catId) : null;
+    if (only) router.push(`/logs/${only.id}`);
+    else openLogsOn(today);
+  };
 
   // Rows in order, so each knows whether it's last (no bottom border).
   const rows: { key: string; node: (last: boolean) => ReactNode }[] = [
@@ -97,7 +109,7 @@ export function LogStatus({
             key: 'more',
             node: (last: boolean) => (
               <Pressable
-                onPress={() => router.push('/logs')}
+                onPress={() => openLogsOn(today)}
                 accessibilityRole="button"
                 className={cn(
                   'flex-row items-center gap-3 px-4 py-3.5 active:bg-fill',
@@ -123,9 +135,13 @@ export function LogStatus({
             key: 'done',
             node: (last: boolean) => (
               <Pressable
-                onPress={() => router.push('/logs')}
+                onPress={openDone}
                 accessibilityRole="button"
-                accessibilityHint="Opens today's logs"
+                accessibilityHint={
+                  done.length === 1
+                    ? `Opens ${done[0].name}'s log`
+                    : "Opens today's logs"
+                }
                 className={cn(
                   'flex-row items-center gap-3 px-4 py-3.5 active:bg-fill',
                   !last && 'border-b border-line-soft',

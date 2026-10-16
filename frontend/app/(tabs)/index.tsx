@@ -81,6 +81,8 @@ export default function HomeScreen() {
     (a) =>
       a.healthIssues.length > 0 && catList.some((c) => c.catId === a.catId),
   );
+  // The cat the alert is about, so tapping it opens Analytics on that cat.
+  const insightCatId = biggestDrop?.cat.catId ?? serverIssue?.catId ?? null;
   const insight = biggestDrop
     ? `${biggestDrop.cat.name} is eating ${Math.abs(biggestDrop.pct)}% less than last week`
     : serverIssue
@@ -180,7 +182,12 @@ export default function HomeScreen() {
             {insight && (
               <View className="px-5">
                 <Pressable
-                  onPress={() => router.push('/dashboard/analytics')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/dashboard/analytics',
+                      params: insightCatId ? { catId: insightCatId } : {},
+                    })
+                  }
                   accessibilityRole="button"
                   accessibilityHint="Opens analytics"
                   className="flex-row items-center gap-3 px-3.5 py-3 rounded-cta bg-attention-soft active:opacity-80"
@@ -235,7 +242,12 @@ export default function HomeScreen() {
                     weeks.get(item.catId) ?? foodWeek([], item.catId, today)
                   }
                   width={cardW}
-                  onPress={() => router.push('/dashboard/analytics')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/dashboard/analytics',
+                      params: { catId: item.catId },
+                    })
+                  }
                 />
               )}
             />
