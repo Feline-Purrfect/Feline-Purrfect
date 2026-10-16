@@ -125,12 +125,12 @@ export default Sentry.wrap(function RootLayout() {
             options={{ title: 'Disease Detail' }}
           />
           <Stack.Screen
-            name="(screens)/profile/index"
-            options={{ title: 'Profile' }}
+            name="(screens)/settings/index"
+            options={{ title: 'Settings' }}
           />
           <Stack.Screen
-            name="(screens)/profile/edit"
-            options={{ title: 'Edit Profile' }}
+            name="(screens)/settings/account"
+            options={{ title: 'Account' }}
           />
         </Stack>
         <StatusBar style="dark" />

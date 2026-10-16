@@ -290,6 +290,25 @@ export function useChangePassword() {
   });
 }
 
+// Update Profile (name)
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (name: string) => authApi.updateProfile(name),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(AUTH_QUERY_KEY, updatedUser);
+    },
+    onError: (error: any) => {
+      console.error('Failed to update profile:', error);
+      Alert.alert(
+        'Couldn’t save',
+        error.message || 'Unable to update your profile. Please try again.',
+      );
+    },
+  });
+}
+
 // Delete Account
 export function useDeleteAccount() {
   const queryClient = useQueryClient();

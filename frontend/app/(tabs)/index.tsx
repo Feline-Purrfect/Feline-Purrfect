@@ -118,7 +118,7 @@ export default function HomeScreen() {
           Home
         </Text>
         <Pressable
-          onPress={() => router.push('/profile')}
+          onPress={() => router.push('/settings')}
           accessibilityRole="button"
           accessibilityLabel="Settings"
           className="w-11 h-11 rounded-full border border-line bg-surface items-center justify-center active:bg-fill"
