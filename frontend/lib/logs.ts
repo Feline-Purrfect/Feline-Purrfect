@@ -73,14 +73,15 @@ export function dayStatus(logs: LogResponse[], date: string, catIds: string[]): 
   return { status, symptom: day.some((l) => l.symptoms.length > 0) };
 }
 
-/** Seven consecutive days ending at `end`. */
-export const weekEnding = (end: string) => Array.from({ length: 7 }, (_, i) => addDays(end, i - 6));
-
-/** Calendar cells for a month: leading nulls for the days before the 1st (weeks start Sunday). */
+/**
+ * Calendar cells for a month, always 6 weeks × 7 days (42 cells) so the grid never changes height.
+ * Days outside the month are null. Weeks start on Sunday.
+ */
 export function monthCells(year: number, month: number): (string | null)[] {
   const first = new Date(year, month, 1);
   const days = new Date(year, month + 1, 0).getDate();
   const cells: (string | null)[] = Array.from({ length: first.getDay() }, () => null);
   for (let d = 1; d <= days; d++) cells.push(toYmd(new Date(year, month, d)));
+  while (cells.length < 42) cells.push(null);
   return cells;
 }

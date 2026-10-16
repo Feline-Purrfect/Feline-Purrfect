@@ -2,17 +2,17 @@ import { ErrorView } from '@/components/common/ErrorView';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Text } from '@/components/ds';
 import { CalendarSheet } from '@/components/logs/CalendarSheet';
-import { CompleteLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
+import { CompactLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
 import { WeekStrip } from '@/components/logs/WeekStrip';
 import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
 import { useLogsRange } from '@/hooks/useLogs';
 import { fromYmd, todayYmd } from '@/lib/dates';
-import { addDays, dayStatus, weekEnding } from '@/lib/logs';
+import { addDays, dayStatus } from '@/lib/logs';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -33,9 +33,8 @@ export default function LogsScreen() {
     });
   }, []));
 
-  // The strip shows the last 7 days; picking an older day from the calendar shows the week ending there.
-  const stripEnd = selected >= addDays(today, -6) ? today : selected;
-  const days = weekEnding(stripEnd);
+  // The selected day sits in the middle of the strip (3 days either side).
+  const days = Array.from({ length: 7 }, (_, i) => addDays(selected, i - 3));
 
   const cats = useCats();
   const week = useLogsRange(days[0], days[6]);
@@ -64,7 +63,7 @@ export default function LogsScreen() {
             <Text variant="label">{MONTH.format(fromYmd(selected))}</Text>
           </Pressable>
         </View>
-        <WeekStrip days={days} selected={selected} onSelect={setSelected} statusFor={(d) => dayStatus(logs, d, catIds).status} />
+        <WeekStrip days={days} selected={selected} today={today} onSelect={setSelected} statusFor={(d) => dayStatus(logs, d, catIds).status} />
       </View>
 
       <ScrollView
@@ -82,8 +81,9 @@ export default function LogsScreen() {
             <Text variant="caption" className="text-center text-body">Add a cat first, then log their food, water and litter here each day.</Text>
             <Button title="Add cat" onPress={() => router.push('/my-cats/create')} className="self-stretch mt-2" />
           </View>
-        ) : week.isLoading ? (
-          <LoadingIndicator />
+        ) : week.isLoading || week.isPlaceholderData ? (
+          // isPlaceholderData: the strip moved and the new days are still loading
+          <ActivityIndicator color={Colors.primary.DEFAULT} className="py-10" />
         ) : week.error ? (
           <Text variant="body" className="text-danger">{(week.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to try again.</Text>
         ) : (
@@ -93,7 +93,7 @@ export default function LogsScreen() {
             .map((cat) => {
               const log = dayLogs.find((l) => l.catId === cat.catId) ?? null;
               return log?.complete ? (
-                <CompleteLogCard key={cat.catId} cat={cat} log={log} onPress={() => router.push(`/logs/${log.id}`)} />
+                <CompactLogCard key={cat.catId} cat={cat} log={log} onPress={() => router.push(`/logs/${log.id}`)} />
               ) : (
                 <PendingLogCard key={cat.catId} cat={cat} log={log} date={selected} isToday={isToday} />
               );

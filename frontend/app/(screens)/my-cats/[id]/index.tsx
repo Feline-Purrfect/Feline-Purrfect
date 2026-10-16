@@ -31,7 +31,7 @@ export default function CatProfileScreen() {
   const { id, tab: tabParam } = useLocalSearchParams<{ id: string; tab?: Tab }>();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>(tabParam && TABS.some((t) => t.key === tabParam) ? tabParam : 'overview');
-  const [viewing, setViewing] = useState<CatPhoto | null>(null);
+  const [viewing, setViewing] = useState<number | null>(null);
 
   const { data: cat, isLoading, error, refetch } = useCat(id);
   const photos = useCatPhotos(id);
@@ -119,7 +119,7 @@ export default function CatProfileScreen() {
               ) : photoList.length === 0 ? (
                 <Text variant="body" className="text-ink-muted py-6 text-center">No photos yet. Add one to start {cat.name}’s album.</Text>
               ) : (
-                <PhotoGrid photos={photoList} columns={3} onPress={setViewing} />
+                <PhotoGrid photos={photoList} columns={3} onPress={(_, i) => setViewing(i)} />
               )}
             </View>
           )}
@@ -131,7 +131,8 @@ export default function CatProfileScreen() {
       </ScrollView>
 
       <PhotoViewer
-        photo={viewing}
+        photos={photoList}
+        index={viewing}
         onClose={() => setViewing(null)}
         onDelete={(p) => deletePhoto.mutate({ catId: p.catId, photoId: p.photoId }, { onSuccess: () => setViewing(null) })}
       />

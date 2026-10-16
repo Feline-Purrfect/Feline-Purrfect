@@ -1,7 +1,7 @@
 import { ErrorView } from '@/components/common/ErrorView';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Text } from '@/components/ds';
-import { CompleteLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
+import { FullLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
 import { useCat } from '@/hooks/useCats';
 import { useLog } from '@/hooks/useLogs';
 import { formatLongDate, todayYmd } from '@/lib/dates';
@@ -34,7 +34,7 @@ export default function LogDetailScreen() {
         </View>
       </View>
       {log.complete ? (
-        <CompleteLogCard cat={cat} log={log} />
+        <FullLogCard cat={cat} log={log} />
       ) : (
         <PendingLogCard cat={cat} log={log} date={log.date} isToday={log.date === todayYmd()} />
       )}

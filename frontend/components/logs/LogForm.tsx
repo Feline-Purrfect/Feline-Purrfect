@@ -1,4 +1,5 @@
 import { CatAvatar } from '@/components/cats/CatAvatar';
+import { PhotoGrid } from '@/components/cats/PhotoGrid';
 import { PhotoViewer } from '@/components/cats/PhotoViewer';
 import {
   Badge,
@@ -28,7 +29,7 @@ import {
   symptomLabel,
   WATER_UNITS,
 } from '@/lib/logs';
-import { CatPhoto, CatResponse, WeightUnit } from '@/types/cat';
+import { CatResponse, WeightUnit } from '@/types/cat';
 import {
   DoseUnit,
   FoodUnit,
@@ -38,7 +39,6 @@ import {
   WaterUnit,
 } from '@/types/log';
 import Feather from '@expo/vector-icons/Feather';
-import { Image } from 'expo-image';
 import { useHeaderHeight } from 'expo-router/react-navigation';
 import { useRef, useState } from 'react';
 import {
@@ -219,7 +219,8 @@ export function LogForm({
   );
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [errors, setErrors] = useState<Errors>({});
-  const [viewing, setViewing] = useState<CatPhoto | null>(null);
+  // Index of the photo open in the carousel; null = closed.
+  const [viewing, setViewing] = useState<number | null>(null);
 
   const { data: photos = [] } = useCatPhotosOn(cat.catId, date);
   const addPhoto = useAddCatPhoto();
@@ -657,45 +658,18 @@ export function LogForm({
           />
         </View>
 
-        {/* Photos — uploaded straight away into the cat's album, dated this day */}
+        {/* Photos — uploaded straight away into the cat's album, dated this day.
+            One grid for the photos and the Add tile, so the Add tile is the same size with or without photos. */}
         <View className="gap-2.5">
           <SectionHeader title="Photos" />
-          <View className="flex-row flex-wrap gap-2">
-            {photos.map((p) => (
-              <Pressable
-                key={p.photoId}
-                onPress={() => setViewing(p)}
-                accessibilityRole="imagebutton"
-                accessibilityLabel="Open photo"
-                className="w-[23%]"
-              >
-                <Image
-                  source={{
-                    uri: p.url ?? undefined,
-                    cacheKey: `photo-${p.photoId}`,
-                  }}
-                  className="w-full aspect-square rounded-tile bg-fill"
-                  contentFit="cover"
-                />
-              </Pressable>
-            ))}
-            <Pressable
-              onPress={uploadPhoto}
-              disabled={addPhoto.isPending}
-              accessibilityRole="button"
-              accessibilityLabel="Add photo"
-              className="w-[23%] aspect-square rounded-tile border border-line-strong bg-surface items-center justify-center gap-1 active:bg-fill"
-            >
-              <Feather
-                name={addPhoto.isPending ? 'loader' : 'camera'}
-                size={18}
-                color={Colors.ink.DEFAULT}
-              />
-              <Text className="font-body-semibold text-micro text-ink">
-                {addPhoto.isPending ? 'Adding' : 'Add'}
-              </Text>
-            </Pressable>
-          </View>
+          <PhotoGrid
+            photos={photos}
+            columns={4}
+            gap={8}
+            onPress={(_, i) => setViewing(i)}
+            onAdd={uploadPhoto}
+            adding={addPhoto.isPending}
+          />
         </View>
 
         {/* Notes */}
@@ -731,7 +705,8 @@ export function LogForm({
       </ScrollView>
 
       <PhotoViewer
-        photo={viewing}
+        photos={photos}
+        index={viewing}
         onClose={() => setViewing(null)}
         onDelete={(p) =>
           deletePhoto.mutate(
