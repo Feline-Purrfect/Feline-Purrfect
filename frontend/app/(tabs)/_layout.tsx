@@ -2,14 +2,12 @@ import { AuthGuard } from '@/components/common/AuthGuard';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/theme';
 import {
-  FontAwesome6,
   Entypo as HomeIcon,
   Ionicons as LogsIcon,
   FontAwesome6 as MyCatsIcon,
   Ionicons as SearchIcon,
 } from '@expo/vector-icons';
-import { router, Tabs } from 'expo-router';
-import { TouchableOpacity } from 'react-native';
+import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
@@ -18,12 +16,20 @@ export default function TabLayout() {
         screenOptions={{
           tabBarActiveTintColor: Colors.primary.DEFAULT,
           tabBarInactiveTintColor: Colors.ink.faint,
-          tabBarStyle: { backgroundColor: Colors.surface, borderTopColor: Colors.line.DEFAULT, borderTopWidth: 1 },
+          tabBarStyle: {
+            backgroundColor: Colors.surface,
+            borderTopColor: Colors.line.DEFAULT,
+            borderTopWidth: 1,
+          },
           tabBarLabelStyle: { fontFamily: Fonts.bodySemibold, fontSize: 11 },
           sceneStyle: { backgroundColor: Colors.canvas },
           headerStyle: { backgroundColor: Colors.canvas },
           headerShadowVisible: false,
-          headerTitleStyle: { fontFamily: Fonts.bodyBold, fontSize: 17, color: Colors.ink.DEFAULT },
+          headerTitleStyle: {
+            fontFamily: Fonts.bodyBold,
+            fontSize: 17,
+            color: Colors.ink.DEFAULT,
+          },
         }}
       >
         <Tabs.Screen
@@ -34,21 +40,7 @@ export default function TabLayout() {
             tabBarIcon: ({ color, size }) => (
               <HomeIcon name="home" color={color} size={size} />
             ),
-            headerRight: () => (
-              <TouchableOpacity
-                onPress={() => router.push('/profile')}
-                style={{
-                  marginRight: 16,
-                  width: 36,
-                  height: 36,
-                  borderRadius: 18,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <FontAwesome6 name="user" size={16} color={Colors.primary.DEFAULT} />
-              </TouchableOpacity>
-            ),
+            headerShown: false, // the screen draws its own large title and Settings button
           }}
         />
         <Tabs.Screen

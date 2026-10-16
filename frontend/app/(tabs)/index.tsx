@@ -1,284 +1,276 @@
 import { ErrorView } from '@/components/common/ErrorView';
 import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { Button, Text } from '@/components/ds';
+import { FoodTrendCard } from '@/components/home/FoodTrendCard';
+import { LogStatus } from '@/components/home/LogStatus';
+import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
 import { useDashboardAnalytics } from '@/hooks/useDashboard';
-import { isSessionExpired } from '@/lib/api/client';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { router } from 'expo-router';
-import { useFocusEffect } from 'expo-router/react-navigation';
-import { useCallback } from 'react';
+import { useLogsRange } from '@/hooks/useLogs';
+import { cn } from '@/lib/cn';
+import { todayYmd } from '@/lib/dates';
+import { foodWeek } from '@/lib/insights';
+import { addDays } from '@/lib/logs';
+import Feather from '@expo/vector-icons/Feather';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
   RefreshControl,
   ScrollView,
-  Text,
-  TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const CARD_GAP = 12;
+const DOTS_MAX = 5; // more cats than this → "2 / 10" instead of dots
 
 export default function HomeScreen() {
-  const {
-    data: cats = [],
-    isLoading: catsLoading,
-    error: catsError,
-    refetch: refetchCats,
-  } = useCats();
-  const {
-    data: analytics,
-    isLoading: analyticsLoading,
-    error: analyticsError,
-    refetch: refetchAnalytics,
-  } = useDashboardAnalytics();
+  const insets = useSafeAreaInsets();
+  const { width: screenW } = useWindowDimensions();
+  const [today, setToday] = useState(todayYmd);
+  const [page, setPage] = useState(0);
 
-  const isLoading = catsLoading || analyticsLoading;
-  const totalHealthIssues =
-    analytics?.analysis.reduce(
-      (sum, cat) => sum + cat.healthIssues.length,
-      0,
-    ) || 0;
-  const totalLogs =
-    analytics?.analysis.reduce((sum, cat) => sum + cat.totalLogs, 0) || 0;
+  const cats = useCats();
+  // Two weeks of logs for every cat: today's status + this week vs last week.
+  const logs = useLogsRange(addDays(today, -13), today);
+  const analytics = useDashboardAnalytics();
 
-  // ✅ Auto-refresh when screen comes into focus
+  // Refresh when coming back to Home (e.g. after saving a log), and pick up a new day after midnight.
   useFocusEffect(
     useCallback(() => {
-      refetchCats();
-      refetchAnalytics();
-    }, [refetchCats, refetchAnalytics]),
+      setToday(todayYmd());
+      cats.refetch();
+      logs.refetch();
+      analytics.refetch();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
   );
 
-  const onRefresh = async () => {
-    await Promise.all([refetchCats(), refetchAnalytics()]);
-  };
+  const catList = useMemo(() => cats.data ?? [], [cats.data]);
+  const logList = useMemo(() => logs.data ?? [], [logs.data]);
+  const weeks = useMemo(
+    () =>
+      new Map(catList.map((c) => [c.catId, foodWeek(logList, c.catId, today)])),
+    [catList, logList, today],
+  );
 
-  if (isLoading) {
-    return <LoadingIndicator />;
-  }
-
-  const error = catsError ?? analyticsError;
-  if (error) {
-    // Session expiry is handled globally (sign-out + redirect); just avoid flashing a second message.
-    if (isSessionExpired(error)) return <LoadingIndicator />;
+  if (cats.isLoading) return <LoadingIndicator />;
+  if (cats.error && !cats.data) {
     return (
       <ErrorView
-        message={(error as any)?.message || 'Could not load your dashboard.'}
-        onRetry={onRefresh}
+        message={(cats.error as any)?.message ?? 'Couldn’t load your cats.'}
+        onRetry={() => cats.refetch()}
       />
     );
   }
 
-  if (cats.length === 0) {
-    return (
-      <View className="flex-1 bg-gray-50 items-center justify-center p-6">
-        <FontAwesome6 name="cat" size={80} color="#d1d5db" />
-        <Text className="text-xl font-bold text-gray-800 mt-6 mb-2">
-          Welcome to Feline Purrfect! 🐱
-        </Text>
-        <Text className="text-gray-600 text-center mb-6">
-          Add your first cat to start tracking their health and wellbeing
-        </Text>
-        <TouchableOpacity
-          onPress={() => router.push('/my-cats/create')}
-          className="bg-primary-500 px-6 py-3 rounded-xl"
-        >
-          <Text className="text-white font-semibold">Add Your First Cat</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
+  // The one thing worth flagging: the biggest food drop (≥15%) this week, else the first issue the
+  // server's analysis found.
+  const biggestDrop = catList
+    .map((c) => ({ cat: c, pct: weeks.get(c.catId)?.changePct ?? null }))
+    .filter(
+      (x): x is { cat: (typeof catList)[number]; pct: number } =>
+        x.pct != null && x.pct <= -15,
+    )
+    .sort((a, b) => a.pct - b.pct)[0];
+  const serverIssue = analytics.data?.analysis.find(
+    (a) =>
+      a.healthIssues.length > 0 && catList.some((c) => c.catId === a.catId),
+  );
+  const insight = biggestDrop
+    ? `${biggestDrop.cat.name} is eating ${Math.abs(biggestDrop.pct)}% less than last week`
+    : serverIssue
+      ? `${serverIssue.catName}: ${serverIssue.healthIssues[0].charAt(0).toLowerCase()}${serverIssue.healthIssues[0].slice(1)}`
+      : null;
+
+  // One card with a peek of the next when there are several cats; full width for a single cat.
+  const single = catList.length === 1;
+  const cardW = single ? screenW - 40 : screenW - 76;
+  const refreshing =
+    cats.isRefetching || logs.isRefetching || analytics.isRefetching;
+  const refresh = () =>
+    Promise.all([cats.refetch(), logs.refetch(), analytics.refetch()]);
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 24 }}
-        refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={onRefresh} />
-        }
-      >
-        {/* Header */}
-        <View className="mb-6">
-          <Text className="text-2xl font-bold text-gray-900">Dashboard</Text>
-          <Text className="text-gray-600 mt-1">
-            Overview of your {cats.length} {cats.length === 1 ? 'cat' : 'cats'}
+    <ScrollView
+      className="flex-1 bg-canvas"
+      contentContainerStyle={{
+        paddingTop: insets.top + 14,
+        paddingBottom: 28,
+        gap: 28,
+      }}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor={Colors.primary.DEFAULT}
+        />
+      }
+    >
+      <View className="px-5 flex-row items-center justify-between">
+        <Text variant="title" accessibilityRole="header">
+          Home
+        </Text>
+        <Pressable
+          onPress={() => router.push('/profile')}
+          accessibilityRole="button"
+          accessibilityLabel="Settings"
+          className="w-11 h-11 rounded-full border border-line bg-surface items-center justify-center active:bg-fill"
+        >
+          <Feather name="settings" size={20} color={Colors.ink.DEFAULT} />
+        </Pressable>
+      </View>
+
+      {catList.length === 0 ? (
+        <View className="mx-5 bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
+          <Text variant="card" className="text-center">
+            Welcome to Feline Purrfect
           </Text>
-        </View>
-
-        {/* Quick Stats */}
-        <View className="flex-row gap-3 mb-6">
-          {/* Total Cats */}
-          <View className="flex-1 bg-purple-500 rounded-2xl p-4">
-            <FontAwesome6 name="cat" size={24} color="white" />
-            <Text className="text-white text-3xl font-bold mt-2">
-              {cats.length}
-            </Text>
-            <Text className="text-purple-100 text-sm">
-              {cats.length === 1 ? 'Cat' : 'Cats'}
-            </Text>
-          </View>
-
-          {/* Total Logs */}
-          <View className="flex-1 bg-blue-500 rounded-2xl p-4">
-            <FontAwesome6 name="clipboard" size={24} color="white" />
-            <Text className="text-white text-3xl font-bold mt-2">
-              {totalLogs}
-            </Text>
-            <Text className="text-blue-100 text-sm">Health Logs</Text>
-          </View>
-        </View>
-
-        {/* Health Alerts Card */}
-        {totalHealthIssues > 0 && (
-          <TouchableOpacity
-            onPress={() => router.push('/dashboard/analytics')}
-            className="bg-red-50 border border-red-200 rounded-2xl p-4 mb-6"
-          >
-            <View className="flex-row items-center justify-between">
-              <View className="flex-1">
-                <View className="flex-row items-center mb-1">
-                  <FontAwesome6
-                    name="triangle-exclamation"
-                    size={18}
-                    color="#dc2626"
-                  />
-                  <Text className="text-red-700 font-bold text-lg ml-2">
-                    Health Alerts
-                  </Text>
-                </View>
-                <Text className="text-red-600 text-sm">
-                  {totalHealthIssues}{' '}
-                  {totalHealthIssues === 1 ? 'issue' : 'issues'} detected across
-                  your cats
-                </Text>
-              </View>
-              <FontAwesome6 name="chevron-right" size={20} color="#dc2626" />
-            </View>
-          </TouchableOpacity>
-        )}
-
-        {/* Cat Summary Cards */}
-        <View className="mb-6">
-          <View className="flex-row items-center justify-between mb-4">
-            <Text className="text-lg font-bold text-gray-900">Your Cats</Text>
-            <TouchableOpacity
-              onPress={() => router.push('/dashboard/analytics')}
-              className="flex-row items-center"
-            >
-              <Text className="text-primary-600 font-semibold mr-1">
-                Detailed View
-              </Text>
-              <FontAwesome6 name="chart-line" size={16} color="#155C8D" />
-            </TouchableOpacity>
-          </View>
-
-          {analytics?.analysis.map((cat) => (
-            <TouchableOpacity
-              key={cat.catId}
-              onPress={() => router.push(`/my-cats/${cat.catId}`)}
-              className="bg-white rounded-2xl p-4 mb-3 border border-gray-100"
-            >
-              <View className="flex-row items-center justify-between mb-3">
-                <View className="flex-1">
-                  <Text className="text-lg font-bold text-gray-900">
-                    {cat.catName}
-                  </Text>
-                  {cat.breed && (
-                    <Text className="text-purple-600 text-sm">{cat.breed}</Text>
-                  )}
-                </View>
-                {cat.healthIssues.length > 0 && (
-                  <View className="bg-red-100 px-3 py-1 rounded-full">
-                    <Text className="text-red-700 text-xs font-semibold">
-                      {cat.healthIssues.length}{' '}
-                      {cat.healthIssues.length === 1 ? 'Alert' : 'Alerts'}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* Quick Stats Row */}
-              <View className="flex-row gap-2">
-                {cat.totalLogs > 0 ? (
-                  <>
-                    <View className="flex-1 bg-gray-50 rounded-lg p-2">
-                      <Text className="text-gray-500 text-xs">Logs</Text>
-                      <Text className="text-gray-900 font-semibold">
-                        {cat.totalLogs}
-                      </Text>
-                    </View>
-                    {cat.averageWeight && (
-                      <View className="flex-1 bg-gray-50 rounded-lg p-2">
-                        <Text className="text-gray-500 text-xs">
-                          Avg Weight
-                        </Text>
-                        <Text className="text-gray-900 font-semibold">
-                          {cat.averageWeight} kg
-                        </Text>
-                      </View>
-                    )}
-                    {cat.averageTemperature && (
-                      <View className="flex-1 bg-gray-50 rounded-lg p-2">
-                        <Text className="text-gray-500 text-xs">Avg Temp</Text>
-                        <Text className="text-gray-900 font-semibold">
-                          {cat.averageTemperature}°C
-                        </Text>
-                      </View>
-                    )}
-                  </>
-                ) : (
-                  <View className="flex-1 bg-gray-50 rounded-lg p-2">
-                    <Text className="text-gray-500 text-sm">
-                      No health logs yet
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Quick Actions */}
-        <View>
-          <Text className="text-lg font-bold text-gray-900 mb-4">
-            Quick Actions
+          <Text variant="caption" className="text-center text-body">
+            Add your cat to start logging food, water and litter each day and to
+            see how they’re doing.
           </Text>
-
-          <TouchableOpacity
-            onPress={() => router.push(`/logs`)}
-            className="bg-white rounded-2xl p-4 mb-3 border border-gray-200 flex-row items-center"
-          >
-            <View className="bg-blue-100 w-12 h-12 rounded-xl items-center justify-center">
-              <FontAwesome6 name="plus" size={20} color="#3b82f6" />
-            </View>
-            <View className="flex-1 ml-4">
-              <Text className="text-gray-900 font-semibold text-base">
-                Log Health Data
-              </Text>
-              <Text className="text-gray-500 text-sm">
-                Record daily activities and health metrics
-              </Text>
-            </View>
-            <FontAwesome6 name="chevron-right" size={20} color="#d1d5db" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
+          <Button
+            title="Add cat"
             onPress={() => router.push('/my-cats/create')}
-            className="bg-white rounded-2xl p-4 border border-gray-200 flex-row items-center"
-          >
-            <View className="bg-purple-100 w-12 h-12 rounded-xl items-center justify-center">
-              <FontAwesome6 name="cat" size={20} color="#9333ea" />
-            </View>
-            <View className="flex-1 ml-4">
-              <Text className="text-gray-900 font-semibold text-base">
-                Add New Cat
-              </Text>
-              <Text className="text-gray-500 text-sm">
-                Register another cat to track
-              </Text>
-            </View>
-            <FontAwesome6 name="chevron-right" size={20} color="#d1d5db" />
-          </TouchableOpacity>
+            className="self-stretch mt-2"
+          />
         </View>
-      </ScrollView>
-    </View>
+      ) : (
+        <>
+          {logs.isLoading ? (
+            <ActivityIndicator
+              color={Colors.primary.DEFAULT}
+              className="py-10"
+            />
+          ) : logs.error && !logs.data ? (
+            <Text variant="body" className="px-5 text-danger">
+              {(logs.error as any)?.message ?? 'Couldn’t load today’s logs.'}{' '}
+              Pull down to try again.
+            </Text>
+          ) : (
+            <LogStatus
+              cats={catList}
+              todayLogs={logList.filter((l) => l.date === today)}
+              today={today}
+            />
+          )}
+
+          <View className="gap-3">
+            <View className="px-5 flex-row items-end justify-between">
+              <Text variant="card" accessibilityRole="header">
+                Analytics
+              </Text>
+              <Pressable
+                onPress={() => router.push('/dashboard/analytics')}
+                accessibilityRole="link"
+                hitSlop={8}
+                className="py-2"
+              >
+                <Text variant="label" className="text-primary">
+                  See details
+                </Text>
+              </Pressable>
+            </View>
+
+            {insight && (
+              <View className="px-5">
+                <Pressable
+                  onPress={() => router.push('/dashboard/analytics')}
+                  accessibilityRole="button"
+                  accessibilityHint="Opens analytics"
+                  className="flex-row items-center gap-3 px-3.5 py-3 rounded-cta bg-attention-soft active:opacity-80"
+                >
+                  <Feather
+                    name="alert-circle"
+                    size={18}
+                    color={Colors.attention.ink}
+                  />
+                  <Text className="flex-1 font-body-medium text-label text-attention-ink leading-5">
+                    {insight}
+                  </Text>
+                  <Feather
+                    name="chevron-right"
+                    size={16}
+                    color={Colors.attention.ink}
+                  />
+                </Pressable>
+              </View>
+            )}
+
+            <FlatList
+              data={catList}
+              keyExtractor={(c) => c.catId}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={cardW + CARD_GAP}
+              snapToAlignment="start"
+              decelerationRate="fast"
+              disableIntervalMomentum
+              contentContainerStyle={{ paddingHorizontal: 20 }}
+              ItemSeparatorComponent={() => (
+                <View style={{ width: CARD_GAP }} />
+              )}
+              onMomentumScrollEnd={(e) =>
+                setPage(
+                  Math.max(
+                    0,
+                    Math.min(
+                      catList.length - 1,
+                      Math.round(
+                        e.nativeEvent.contentOffset.x / (cardW + CARD_GAP),
+                      ),
+                    ),
+                  ),
+                )
+              }
+              renderItem={({ item }) => (
+                <FoodTrendCard
+                  cat={item}
+                  week={
+                    weeks.get(item.catId) ?? foodWeek([], item.catId, today)
+                  }
+                  width={cardW}
+                  onPress={() => router.push('/dashboard/analytics')}
+                />
+              )}
+            />
+
+            {catList.length > 1 &&
+              (catList.length <= DOTS_MAX ? (
+                <View
+                  className="flex-row justify-center gap-1.5"
+                  importantForAccessibility="no-hide-descendants"
+                  accessibilityElementsHidden
+                >
+                  {catList.map((c, i) => (
+                    <View
+                      key={c.catId}
+                      className={cn(
+                        'h-1.5 rounded-full',
+                        i === page
+                          ? 'w-[18px] bg-primary'
+                          : 'w-1.5 bg-line-dot',
+                      )}
+                    />
+                  ))}
+                </View>
+              ) : (
+                <Text
+                  variant="caption"
+                  className="self-center font-body-semibold"
+                  style={{ fontVariant: ['tabular-nums'] }}
+                >
+                  {page + 1} / {catList.length}
+                </Text>
+              ))}
+          </View>
+        </>
+      )}
+    </ScrollView>
   );
 }
