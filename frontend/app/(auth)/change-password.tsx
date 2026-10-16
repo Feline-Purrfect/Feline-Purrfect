@@ -1,83 +1,25 @@
-import { Button, Field, Text, TextField } from '@/components/ds';
-import { Colors } from '@/constants/colors';
-import { useChangePassword } from '@/hooks/useAuth';
-import { cn } from '@/lib/cn';
-import Feather from '@expo/vector-icons/Feather';
+import { PasswordField } from '@/components/auth/PasswordField';
+import { PasswordRules } from '@/components/auth/PasswordRules';
+import { Button, Field, Text } from '@/components/ds';
+import { useAuth, useChangePassword } from '@/hooks/useAuth';
+import { passwordRules } from '@/lib/password';
 import { router } from 'expo-router';
 import { useHeaderHeight } from 'expo-router/react-navigation';
-import { forwardRef, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
   TextInput,
-  TextInputProps,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-/** Password input with a show/hide button inside the field. */
-const PasswordField = forwardRef<
-  TextInput,
-  TextInputProps & { visible: boolean; onToggle?: () => void }
->(function PasswordField({ visible, onToggle, ...rest }, ref) {
-  return (
-    <View className="justify-center">
-      <TextField
-        ref={ref}
-        secureTextEntry={!visible}
-        autoCapitalize="none"
-        autoCorrect={false}
-        className={onToggle ? 'pr-14' : undefined}
-        {...rest}
-      />
-      {onToggle && (
-        <Pressable
-          onPress={onToggle}
-          accessibilityRole="button"
-          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
-          className="absolute right-0.5 w-11 h-11 items-center justify-center"
-        >
-          <Feather
-            name={visible ? 'eye-off' : 'eye'}
-            size={20}
-            color={Colors.ink.muted}
-          />
-        </Pressable>
-      )}
-    </View>
-  );
-});
-
-// Mirrors the server's rule (backend/src/routes/auth.js → assertStrongPassword), so the button only
-// enables for a password the API will accept.
-const rulesFor = (cur: string, next: string, confirm: string) => [
-  {
-    label: 'At least 8 characters',
-    ok: next.length >= 8 && next.length <= 128,
-  },
-  {
-    label: 'Upper- and lower-case letters',
-    ok: /[a-z]/.test(next) && /[A-Z]/.test(next),
-  },
-  {
-    label: 'A number and a symbol',
-    ok: /\d/.test(next) && /[^A-Za-z0-9]/.test(next),
-  },
-  {
-    label: 'Different from your current password',
-    ok: next.length > 0 && next !== cur,
-  },
-  {
-    label: 'Both new passwords match',
-    ok: confirm.length > 0 && confirm === next,
-  },
-];
-
 export default function ChangePasswordScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
+  const { user } = useAuth();
   const [cur, setCur] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -88,7 +30,7 @@ export default function ChangePasswordScreen() {
 
   const { mutate: changePassword, isPending } = useChangePassword();
 
-  const rules = rulesFor(cur, next, confirm);
+  const rules = passwordRules(next, confirm, cur);
   const ready = cur.length > 0 && rules.every((r) => r.ok);
 
   const submit = () => {
@@ -132,7 +74,12 @@ export default function ChangePasswordScreen() {
             />
           </Field>
           <Pressable
-            onPress={() => router.push('/forgot-password')}
+            onPress={() =>
+              router.push({
+                pathname: '/forgot-password',
+                params: user?.email ? { email: user.email } : {},
+              })
+            }
             accessibilityRole="link"
             hitSlop={8}
             className="self-start py-1"
@@ -174,38 +121,7 @@ export default function ChangePasswordScreen() {
             />
           </Field>
 
-          <View
-            accessibilityLiveRegion="polite"
-            className="bg-surface border border-line rounded-cta px-4 py-3.5 gap-2.5"
-          >
-            {rules.map((r) => (
-              <View
-                key={r.label}
-                accessible
-                accessibilityLabel={`${r.label}, ${r.ok ? 'done' : 'not yet'}`}
-                className="flex-row items-center gap-2.5"
-              >
-                <View
-                  className={cn(
-                    'w-5 h-5 rounded-full items-center justify-center',
-                    r.ok ? 'bg-primary' : 'border-[1.5px] border-[#C4BEB3]',
-                  )}
-                >
-                  {r.ok && (
-                    <Feather name="check" size={12} color={Colors.surface} />
-                  )}
-                </View>
-                <Text
-                  className={cn(
-                    'font-body text-label',
-                    r.ok ? 'text-ink' : 'text-ink-muted',
-                  )}
-                >
-                  {r.label}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <PasswordRules rules={rules} />
         </View>
 
         <Button

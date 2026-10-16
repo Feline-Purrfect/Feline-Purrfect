@@ -37,6 +37,8 @@ export const Colors = {
     deep: '#5E2C0A',
   },
   danger: '#A33A2A',
+  dangerSoft: '#F8E6E2', // error banner background
+  dangerInk: '#7E2A1D', // text and icon on dangerSoft
   avatar: [
     { bg: '#DCD5C9', ink: '#4A453D' }, // stone
     { bg: '#CFD6E2', ink: '#3B4456' }, // slate

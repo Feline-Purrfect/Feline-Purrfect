@@ -20,7 +20,7 @@ export function SettingsSection({
         accessibilityRole="header"
         className="ml-1 font-body-bold text-caption uppercase tracking-[0.8px] text-ink-muted"
       >
-        {title + 'hihi'}
+        {title}
       </Text>
       <View className="bg-surface border border-line rounded-card overflow-hidden">
         {children}

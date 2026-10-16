@@ -385,6 +385,42 @@ test('auth/verify + reset: bad/expired code → CodeMismatchException; rate limi
   assert.equal(r.status, 429); assert.equal(r.body.code, 'LimitExceededException');
 });
 
+test('auth/verify-reset-code: valid code returns a resetToken; bad code → CodeMismatchException', async () => {
+  authResponses.verifyOtp = { data: { session: { access_token: 'RECOVERY' }, user: { id: USER_A } }, error: null };
+  let r = await call(auth, 'POST', '/verify-reset-code', { body: { email: 'a@example.com', code: ' 123456 ' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.body.resetToken, 'RECOVERY');
+
+  authResponses.verifyOtp = { data: {}, error: { code: 'otp_expired', status: 403, message: 'Token has expired or is invalid' } };
+  r = await call(auth, 'POST', '/verify-reset-code', { body: { email: 'a@example.com', code: '000000' } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, 'CodeMismatchException');
+});
+
+test('auth/reset-password with resetToken: sets the password and signs every session out', async () => {
+  const calls = { updated: null, signedOut: null };
+  authResponses.adminGetUser = { data: { user: { id: USER_A, email: 'a@example.com' } }, error: null };
+  authResponses.adminUpdateUserById = (id, attrs) => { calls.updated = { id, attrs }; return { error: null }; };
+  authResponses.adminSignOut = (jwt, scope) => { calls.signedOut = { jwt, scope }; return { error: null }; };
+
+  const r = await call(auth, 'POST', '/reset-password', { body: { resetToken: 'RECOVERY', newPassword: GOOD_PW } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(calls.updated, { id: USER_A, attrs: { password: GOOD_PW } });
+  assert.deepEqual(calls.signedOut, { jwt: 'RECOVERY', scope: 'global' });
+});
+
+test('auth/reset-password with resetToken: expired token → ExpiredCodeException; weak password rejected first', async () => {
+  let r = await call(auth, 'POST', '/reset-password', { body: { resetToken: 'STALE', newPassword: GOOD_PW } });
+  assert.equal(r.status, 400);
+  assert.equal(r.body.code, 'ExpiredCodeException');
+
+  r = await call(auth, 'POST', '/reset-password', { body: { resetToken: 'RECOVERY', newPassword: 'weak' } });
+  assert.equal(r.body.code, 'InvalidPasswordException');
+
+  r = await call(auth, 'POST', '/reset-password', { body: { newPassword: GOOD_PW } });
+  assert.equal(r.status, 400);
+});
+
 test('auth/forgot-password: never reveals whether the email exists', async () => {
   authResponses.resetPasswordForEmail = { data: {}, error: { code: 'user_not_found', status: 404, message: 'nope' } };
   assert.equal((await call(auth, 'POST', '/forgot-password', { body: { email: 'ghost@example.com' } })).status, 200);

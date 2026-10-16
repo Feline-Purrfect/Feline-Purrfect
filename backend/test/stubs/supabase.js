@@ -10,9 +10,20 @@ const fakeAuthClient = () => new Proxy({}, {
     : undefined),
 });
 
+// Tests can override admin calls through authResponses.adminGetUser / adminUpdateUserById / adminSignOut.
 const adminAuth = {
-  getUser: async () => ({ data: { user: null }, error: { message: 'bad' } }),
-  admin: { updateUserById: async () => ({ error: null }), deleteUser: async () => ({ error: null }) },
+  getUser: async (...args) => (typeof authResponses.adminGetUser === 'function'
+    ? authResponses.adminGetUser(...args)
+    : authResponses.adminGetUser ?? { data: { user: null }, error: { message: 'bad' } }),
+  admin: {
+    updateUserById: async (...args) => (typeof authResponses.adminUpdateUserById === 'function'
+      ? authResponses.adminUpdateUserById(...args)
+      : authResponses.adminUpdateUserById ?? { error: null }),
+    deleteUser: async () => ({ error: null }),
+    signOut: async (...args) => (typeof authResponses.adminSignOut === 'function'
+      ? authResponses.adminSignOut(...args)
+      : { error: null }),
+  },
 };
 
 export const admin = {

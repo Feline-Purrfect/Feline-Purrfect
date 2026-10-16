@@ -82,7 +82,11 @@ module.exports = {
           deep: '#5E2C0A',    // callout body text
         },
 
-        danger: '#A33A2A',    // destructive text actions only
+        danger: {
+          DEFAULT: '#A33A2A', // destructive text actions, invalid field borders
+          soft: '#F8E6E2',    // error banner background
+          ink: '#7E2A1D',     // text on danger-soft
+        },
 
         // Initial avatars for cats without a photo (paired background / ink)
         avatar: {

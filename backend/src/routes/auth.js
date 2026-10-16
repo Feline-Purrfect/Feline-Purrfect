@@ -135,10 +135,43 @@ router.post('/forgot-password', async (req, res) => {
   res.json({ message: 'Password reset code sent to your email' });
 });
 
+// Step 1 of the reset: check the emailed code on its own, so a typo is reported before the user picks a
+// new password. A valid recovery code yields a short-lived session; its access token is handed back as
+// a one-purpose `resetToken` for step 2.
+router.post('/verify-reset-code', async (req, res) => {
+  const body = parse(z.object({ email, code: nonEmpty('Reset code') }), req.body);
+  const { data, error } = await authClient().auth.verifyOtp({ email: body.email, token: body.code.trim(), type: 'recovery' });
+  if (error) throw authError(error);
+  if (!data?.session?.access_token) throw new HttpError(400, 'CodeMismatchException', 'Invalid reset code');
+  res.json({ message: 'Code verified', resetToken: data.session.access_token });
+});
+
+// Step 2: set the new password with the token from /verify-reset-code.
+// The old one-shot shape ({ email, code, newPassword }) is still accepted for app builds that predate it.
 router.post('/reset-password', async (req, res) => {
-  const body = parse(z.object({ email, code: nonEmpty('Reset code'), newPassword: nonEmpty('New password') }), req.body);
+  const body = parse(z.object({
+    resetToken: z.string().min(1).max(4096).optional(),
+    email: email.optional(),
+    code: nonEmpty('Reset code').optional(),
+    newPassword: nonEmpty('New password'),
+  }), req.body);
   assertStrongPassword(body.newPassword);
 
+  if (body.resetToken) {
+    const { data, error } = await admin.auth.getUser(body.resetToken);
+    if (error || !data?.user) {
+      throw new HttpError(400, 'ExpiredCodeException', 'Your reset code has expired. Please request a new one.');
+    }
+    const updated = await admin.auth.admin.updateUserById(data.user.id, { password: body.newPassword });
+    if (updated.error) throw authError(updated.error);
+
+    // Kill every session for this user, including the recovery one.
+    await Promise.resolve(admin.auth.admin.signOut(body.resetToken, 'global')).catch(() => {});
+    forgetUser(data.user.id);
+    return res.json({ message: 'Password reset successfully. You can now sign in with your new password.' });
+  }
+
+  if (!body.email || !body.code) throw new HttpError(400, 'InvalidParameterException', 'Reset code is required');
   const client = authClient();
   const verified = await client.auth.verifyOtp({ email: body.email, token: body.code.trim(), type: 'recovery' });
   if (verified.error) throw authError(verified.error);
