@@ -12,6 +12,9 @@ export interface CatAnalysis {
   averagePeeCount: string | null;
   averageFoodCount: string | null;
   averageWaterCount: string | null;
+  /** Average in the unit of the most recent log, e.g. { amount: '136', unit: 'g' }. */
+  averageFood: { amount: string; unit: string } | null;
+  averageWater: { amount: string; unit: string } | null;
   healthIssues: string[];
   totalLogs: number;
 }

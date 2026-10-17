@@ -1,5 +1,4 @@
-import { Text, TouchableOpacity } from 'react-native';
-import { twMerge } from 'tailwind-merge';
+import { Button } from '@/components/ds/Button';
 
 interface ButtonProps {
   content: string;
@@ -9,26 +8,10 @@ interface ButtonProps {
   textClassName?: string;
 }
 
-export function CustomButton ({
-  content,
-  onPress,
-  disabled = false,
-  className = '',
-  textClassName = ''
-}: ButtonProps) {
-  const baseStyle = 'bg-primary px-4 py-5 rounded-xl items-center';
-  const baseTextStyle = 'text-white text-lg font-bold';
-
-  return(
-    <TouchableOpacity
-      className={twMerge(baseStyle + ' ' + className)}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.8}
-    >
-      <Text className={twMerge(baseTextStyle + ' ' + textClassName)}>
-        {content}
-      </Text>
-    </TouchableOpacity>
-  );
+/**
+ * Legacy API kept so screens that aren't redesigned yet pick up the new primary button.
+ * New code: use `Button` from '@/components/ds'.
+ */
+export function CustomButton({ content, onPress, disabled = false, className = '', textClassName = '' }: ButtonProps) {
+  return <Button title={content} onPress={onPress} disabled={disabled} className={className} textClassName={textClassName} />;
 }

@@ -3,28 +3,67 @@ import express from 'express';
 import { z } from 'zod';
 import { admin } from '../lib/supabase.js';
 import { HttpError, notFound, parse, isUuid } from '../lib/errors.js';
-import { toCat } from '../lib/mappers.js';
+import { toCat, toPhoto } from '../lib/mappers.js';
 import { requireAuth } from '../middleware/auth.js';
-import { uploadCatPhoto, signPhotoPaths, deletePhotos } from '../services/storage.js';
+import { uploadCatPhoto, uploadGalleryPhoto, signPhotoPaths, deletePhotos } from '../services/storage.js';
 import logger from '../lib/logger.js';
 
 const router = express.Router();
 router.use(requireAuth);
 
-const text = z.string().trim().max(100).nullish();
-const isoDate = z.string().refine((d) => !Number.isNaN(Date.parse(d)), 'Invalid date');
+// ------------------------------------------------------------------ validation
+const todayUtc = () => new Date().toISOString().slice(0, 10);
+const plusDays = (ymd, n) => new Date(Date.parse(`${ymd}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
 
-const catSchema = z.object({
+// Calendar dates travel as YYYY-MM-DD. A full ISO timestamp is accepted and trimmed (older app builds).
+const calendarDate = (label) => z.string({ required_error: `${label} is required` })
+  .transform((s) => s.slice(0, 10))
+  .refine((s) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s)), `${label} must be YYYY-MM-DD`)
+  // +1 day of slack: the phone's "today" can be ahead of UTC.
+  .refine((s) => s <= plusDays(todayUtc(), 1), `${label} can't be in the future`)
+  .refine((s) => s >= '1980-01-01', `${label} is too far in the past`);
+
+const text = z.string().trim().max(100).nullish();
+
+// Accept "985 112 004 384 821" or "985-112-…": keep digits only. Empty means "no microchip".
+const microchip = z.string().nullish().transform((v) => (v == null ? v : v.replace(/\D/g, '') || null))
+  .refine((v) => v == null || /^\d{9,15}$/.test(v), 'Microchip ID must be 9–15 digits');
+
+const catFields = {
   name: z.string({ required_error: 'Name is required' }).trim().min(1, 'Name is required').max(100),
-  age: z.number().min(0).max(40).optional(),
-  sex: z.enum(['male', 'female']).optional(),
-  adoptedDate: isoDate.optional(),
-  weight: z.number().min(0).max(50).nullish(),
+  sex: z.enum(['male', 'female'], { required_error: 'Sex is required', invalid_type_error: 'Sex must be male or female' }),
+  birthDate: calendarDate('Birthday'),
+  birthDateEstimated: z.boolean().optional(),
+  adoptedDate: calendarDate('Adopted date'),
+  weight: z.number().min(0).max(30, 'Weight must be 30 kg or less').nullish(), // always kilograms
+  weightUnit: z.enum(['kg', 'lb']).optional(),                                 // how the owner wants to see it
   breed: text,
   color: text,
-  microchipId: z.string().trim().max(50).nullish(),
+  microchipId: microchip,
   photo: z.string().max(10_000_000).nullish(), // base64 / data URI
+  age: z.number().min(0).max(40).optional(),    // legacy clients only: converted to an estimated birthday
+};
+
+const createSchema = z.object({
+  ...catFields,
+  birthDate: catFields.birthDate.optional(),
+  adoptedDate: catFields.adoptedDate.optional(),
+}).superRefine((b, ctx) => {
+  if (!b.birthDate && b.age === undefined) ctx.addIssue({ code: 'custom', path: ['birthDate'], message: 'Birthday is required' });
 });
+const updateSchema = z.object(catFields).partial();
+
+function birthDateFromAge(age) {
+  const d = new Date();
+  d.setUTCMonth(d.getUTCMonth() - Math.round(age * 12));
+  return d.toISOString().slice(0, 10);
+}
+
+function assertDatesInOrder(birthDate, adoptedDate) {
+  if (birthDate && adoptedDate && adoptedDate < birthDate) {
+    throw new HttpError(400, 'ValidationError', 'Adopted date can’t be before the birthday');
+  }
+}
 
 // ------------------------------------------------------------------ helpers
 async function findOwnedCat(userId, catId) {
@@ -35,17 +74,65 @@ async function findOwnedCat(userId, catId) {
   return data;
 }
 
-async function withPhotoUrl(row) {
-  const urls = await signPhotoPaths([row.photo_path]);
-  return toCat(row, urls.get(row.photo_path) ?? null);
+/**
+ * Card status for each cat from its most recent log in the last two weeks:
+ * `lastLogDate` (the app compares it with the phone's local "today") and an `attention` label when
+ * the latest log (within 2 days) shows something worth a look.
+ */
+async function logSummaries(userId, catIds) {
+  const out = new Map();
+  if (catIds.length === 0) return out;
+  const since = plusDays(todayUtc(), -14);
+  const { data, error } = await admin
+    .from('logs')
+    .select('cat_id,log_date,symptoms,appetite,energy')
+    .eq('user_id', userId)
+    .gte('log_date', since)
+    .order('log_date', { ascending: false });
+  if (error) throw error;
+
+  const recent = plusDays(todayUtc(), -2);
+  for (const l of data ?? []) {
+    if (out.has(l.cat_id)) continue; // rows are newest-first; first one wins
+    let attention = null;
+    if (l.log_date >= recent) {
+      const first = Array.isArray(l.symptoms) ? l.symptoms[0] : null;
+      if (first?.name) attention = first.count > 1 ? `${first.name} ×${first.count}` : first.name;
+      else if (l.appetite != null && l.appetite <= 2) attention = 'Eating less';
+      else if (l.energy != null && l.energy <= 2) attention = 'Low energy';
+    }
+    out.set(l.cat_id, { lastLogDate: String(l.log_date).slice(0, 10), attention });
+  }
+  return out;
 }
 
-// ------------------------------------------------------------------ routes
+async function present(rows, userId) {
+  const [urls, summaries] = await Promise.all([
+    signPhotoPaths(rows.map((c) => c.photo_path)),
+    logSummaries(userId, rows.filter((c) => !c.archived_at).map((c) => c.cat_id)),
+  ]);
+  return rows.map((c) => toCat(c, { photoUrl: urls.get(c.photo_path) ?? null, ...(summaries.get(c.cat_id) ?? {}) }));
+}
+
+const presentOne = async (row, userId) => (await present([row], userId))[0];
+
+async function galleryPaths(userId, catId) {
+  let q = admin.from('cat_photos').select('path').eq('user_id', userId);
+  if (catId) q = q.eq('cat_id', catId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []).map((p) => p.path);
+}
+
+// ------------------------------------------------------------------ cats
 router.post('/', async (req, res) => {
-  const body = parse(catSchema, req.body);
+  const body = parse(createSchema, req.body);
+  const birthDate = body.birthDate ?? birthDateFromAge(body.age);
+  const adoptedDate = body.adoptedDate ?? todayUtc();
+  assertDatesInOrder(birthDate, adoptedDate);
   const catId = crypto.randomUUID();
 
-  // Mirrors the old behaviour: a failed photo upload doesn't block creating the cat.
+  // A failed photo upload doesn't block creating the cat.
   let photoPath = null;
   if (body.photo) {
     try {
@@ -60,10 +147,12 @@ router.post('/', async (req, res) => {
     cat_id: catId,
     user_id: req.user.id,
     name: body.name,
-    age: body.age ?? 0,
-    sex: body.sex ?? 'female',
-    adopted_date: body.adoptedDate ?? new Date().toISOString(),
+    sex: body.sex,
+    birth_date: birthDate,
+    birth_date_estimated: body.birthDate ? (body.birthDateEstimated ?? false) : true,
+    adopted_date: adoptedDate,
     weight: body.weight ?? null,
+    weight_unit: body.weightUnit ?? 'kg',
     breed: body.breed ?? null,
     color: body.color ?? null,
     microchip_id: body.microchipId ?? null,
@@ -74,35 +163,67 @@ router.post('/', async (req, res) => {
     await deletePhotos([photoPath]);
     throw error;
   }
-  res.status(201).json({ message: 'Cat created successfully', cat: await withPhotoUrl(data) });
+  res.status(201).json({ message: 'Cat added', cat: await presentOne(data, req.user.id) });
 });
 
+// ?archived=true lists archived cats; the default is the active ones.
 router.get('/', async (req, res) => {
-  const { data, error } = await admin.from('cats').select('*').eq('user_id', req.user.id).order('created_at', { ascending: true });
+  const archived = req.query.archived === 'true';
+  let q = admin.from('cats').select('*').eq('user_id', req.user.id);
+  q = archived ? q.not('archived_at', 'is', null) : q.is('archived_at', null);
+  const { data, error } = await q.order(archived ? 'archived_at' : 'created_at', { ascending: !archived });
+  if (error) throw error;
+  res.json({ cats: await present(data, req.user.id) });
+});
+
+// Most recent gallery photos across the user's active cats ("Recent photos" on My cats).
+// Registered before '/:id' so "photos" is never treated as a cat id.
+router.get('/photos/recent', async (req, res) => {
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 6, 1), 30);
+  const { data: cats, error: catsError } = await admin.from('cats').select('cat_id,name').eq('user_id', req.user.id).is('archived_at', null);
+  if (catsError) throw catsError;
+  if (cats.length === 0) return res.json({ photos: [] });
+
+  const names = new Map(cats.map((c) => [c.cat_id, c.name]));
+  const { data, error } = await admin.from('cat_photos').select('*')
+    .eq('user_id', req.user.id).in('cat_id', [...names.keys()])
+    .order('taken_on', { ascending: false }).order('created_at', { ascending: false })
+    .limit(limit);
   if (error) throw error;
 
-  const urls = await signPhotoPaths(data.map((c) => c.photo_path));
-  res.json({ cats: data.map((c) => toCat(c, urls.get(c.photo_path) ?? null)) });
+  const urls = await signPhotoPaths(data.map((p) => p.path));
+  res.json({ photos: data.map((p) => toPhoto(p, urls.get(p.path), names.get(p.cat_id))) });
 });
 
 router.get('/:id', async (req, res) => {
   const row = await findOwnedCat(req.user.id, req.params.id);
-  res.json({ cat: await withPhotoUrl(row) });
+  res.json({ cat: await presentOne(row, req.user.id) });
 });
 
 router.put('/:id', async (req, res) => {
   const existing = await findOwnedCat(req.user.id, req.params.id);
-  const body = parse(catSchema.partial(), req.body);
+  const body = parse(updateSchema, req.body);
 
   const patch = {};
   if (body.name !== undefined) patch.name = body.name;
-  if (body.age !== undefined) patch.age = body.age;
   if (body.sex !== undefined) patch.sex = body.sex;
+  if (body.birthDate !== undefined) patch.birth_date = body.birthDate;
+  if (body.birthDateEstimated !== undefined) patch.birth_date_estimated = body.birthDateEstimated;
+  if (body.birthDate === undefined && body.age !== undefined) {
+    patch.birth_date = birthDateFromAge(body.age);
+    patch.birth_date_estimated = true;
+  }
   if (body.adoptedDate !== undefined) patch.adopted_date = body.adoptedDate;
   if (body.weight !== undefined) patch.weight = body.weight;
+  if (body.weightUnit !== undefined) patch.weight_unit = body.weightUnit;
   if (body.breed !== undefined) patch.breed = body.breed;
   if (body.color !== undefined) patch.color = body.color;
   if (body.microchipId !== undefined) patch.microchip_id = body.microchipId;
+
+  assertDatesInOrder(
+    patch.birth_date ?? String(existing.birth_date ?? '').slice(0, 10),
+    patch.adopted_date ?? String(existing.adopted_date ?? '').slice(0, 10),
+  );
 
   // A remote URL means "unchanged" (the app echoes back the existing photoUrl); only upload new local images.
   if (body.photo && !body.photo.startsWith('http')) {
@@ -116,15 +237,92 @@ router.put('/:id', async (req, res) => {
 
   const { data, error } = await admin.from('cats').update(patch).eq('cat_id', existing.cat_id).eq('user_id', req.user.id).select().single();
   if (error) throw error;
-  res.json({ message: 'Cat updated successfully', cat: await withPhotoUrl(data) });
+  res.json({ message: 'Changes saved', cat: await presentOne(data, req.user.id) });
 });
 
+// Permanent. The app only offers this for archived cats.
 router.delete('/:id', async (req, res) => {
   const existing = await findOwnedCat(req.user.id, req.params.id);
-  const { error } = await admin.from('cats').delete().eq('cat_id', existing.cat_id).eq('user_id', req.user.id); // logs cascade
+  const paths = await galleryPaths(req.user.id, existing.cat_id);
+  const { error } = await admin.from('cats').delete().eq('cat_id', existing.cat_id).eq('user_id', req.user.id); // logs + photo rows cascade
   if (error) throw error;
-  await deletePhotos([existing.photo_path]);
-  res.json({ message: 'Cat deleted successfully' });
+  await deletePhotos([existing.photo_path, ...paths]);
+  res.json({ message: 'Cat deleted' });
+});
+
+// Archive = the cat has passed away. Logs, photos and reports stay; reminders stop; hidden from My cats.
+router.post('/:id/archive', async (req, res) => {
+  const existing = await findOwnedCat(req.user.id, req.params.id);
+  if (existing.archived_at) return res.json({ message: 'Cat archived', cat: await presentOne(existing, req.user.id) });
+  const { data, error } = await admin.from('cats').update({ archived_at: new Date().toISOString() })
+    .eq('cat_id', existing.cat_id).eq('user_id', req.user.id).select().single();
+  if (error) throw error;
+  res.json({ message: 'Cat archived', cat: await presentOne(data, req.user.id) });
+});
+
+router.post('/:id/unarchive', async (req, res) => {
+  const existing = await findOwnedCat(req.user.id, req.params.id);
+  const { data, error } = await admin.from('cats').update({ archived_at: null })
+    .eq('cat_id', existing.cat_id).eq('user_id', req.user.id).select().single();
+  if (error) throw error;
+  res.json({ message: 'Cat restored', cat: await presentOne(data, req.user.id) });
+});
+
+// ------------------------------------------------------------------ gallery
+const photoSchema = z.object({
+  photo: z.string({ required_error: 'Photo is required' }).min(1, 'Photo is required').max(10_000_000),
+  takenOn: calendarDate('Photo date').optional(),
+});
+
+router.get('/:id/photos', async (req, res) => {
+  const cat = await findOwnedCat(req.user.id, req.params.id);
+  const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 200);
+  const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
+
+  // ?on=YYYY-MM-DD → only photos from that day (shown on that day's log)
+  const on = typeof req.query.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.on) ? req.query.on : null;
+
+  let q = admin.from('cat_photos').select('*', { count: 'exact' }).eq('cat_id', cat.cat_id).eq('user_id', req.user.id);
+  if (on) q = q.eq('taken_on', on);
+  const { data, error, count } = await q
+    .order('taken_on', { ascending: false }).order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+
+  const urls = await signPhotoPaths(data.map((p) => p.path));
+  res.json({ photos: data.map((p) => toPhoto(p, urls.get(p.path))), total: count ?? data.length });
+});
+
+router.post('/:id/photos', async (req, res) => {
+  const cat = await findOwnedCat(req.user.id, req.params.id);
+  const body = parse(photoSchema, req.body);
+  const photoId = crypto.randomUUID();
+
+  const path = await uploadGalleryPhoto(req.user.id, cat.cat_id, photoId, body.photo);
+  const { data, error } = await admin.from('cat_photos').insert({
+    photo_id: photoId,
+    cat_id: cat.cat_id,
+    user_id: req.user.id,
+    path,
+    taken_on: body.takenOn ?? todayUtc(),
+  }).select().single();
+  if (error) {
+    await deletePhotos([path]);
+    throw error;
+  }
+  const urls = await signPhotoPaths([path]);
+  res.status(201).json({ message: 'Photo added', photo: toPhoto(data, urls.get(path)) });
+});
+
+router.delete('/:id/photos/:photoId', async (req, res) => {
+  const cat = await findOwnedCat(req.user.id, req.params.id);
+  if (!isUuid(req.params.photoId)) throw notFound('Photo');
+  const { data, error } = await admin.from('cat_photos').delete()
+    .eq('photo_id', req.params.photoId).eq('cat_id', cat.cat_id).eq('user_id', req.user.id).select('path');
+  if (error) throw error;
+  if (!data || data.length === 0) throw notFound('Photo');
+  await deletePhotos(data.map((p) => p.path));
+  res.json({ message: 'Photo deleted' });
 });
 
 export default router;

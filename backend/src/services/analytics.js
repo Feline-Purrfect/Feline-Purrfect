@@ -16,6 +16,8 @@ function analyzeLogs(logs) {
       averagePeeCount: null,
       averageFoodCount: null,
       averageWaterCount: null,
+      averageFood: null,
+      averageWater: null,
       healthIssues: [],
       totalLogs: 0,
     };
@@ -34,6 +36,20 @@ function analyzeLogs(logs) {
   const appetiteTrend = avg(recent.filter((l) => l.appetite).map((l) => l.appetite));
   const energyTrend = avg(recent.filter((l) => l.energy).map((l) => l.energy));
 
+  // Food and water are averaged in the unit of the most recent entry (mixing grams and cups would be
+  // meaningless); only logs recorded in that unit count. Grams/ml are whole numbers, cups/portions/bowls 1 dp.
+  const averageInLatestUnit = (amountKey, unitKey) => {
+    const latest = logs.find((l) => l[amountKey] != null && l[unitKey]);
+    if (!latest) return null;
+    const unit = latest[unitKey];
+    const values = logs.filter((l) => l[amountKey] != null && l[unitKey] === unit).map((l) => l[amountKey]);
+    return { amount: avg(values).toFixed(unit === 'g' || unit === 'ml' ? 0 : 1), unit };
+  };
+  const averageFood = averageInLatestUnit('foodAmount', 'foodUnit');
+  const averageWater = averageInLatestUnit('waterAmount', 'waterUnit');
+
+  const symptomDays = (name) => (list) => list.filter((l) => (l.symptoms ?? []).some((x) => x.name?.toLowerCase() === name)).length;
+
   const healthIssues = [];
   const lastThree = recent.slice(0, 3);
   if (lastThree.filter((l) => l.vomiting).length >= 2) healthIssues.push('Frequent vomiting detected in recent logs');
@@ -41,7 +57,8 @@ function analyzeLogs(logs) {
   if (averageTemperature && (averageTemperature < 37.5 || averageTemperature > 39.5)) {
     healthIssues.push('Temperature outside normal range (37.5-39.5°C)');
   }
-  if (appetiteTrend && appetiteTrend < 3) healthIssues.push('Low appetite trend detected');
+  if ((appetiteTrend && appetiteTrend < 3) || symptomDays('low appetite')(lastThree) >= 2) healthIssues.push('Low appetite trend detected');
+  if (symptomDays('lethargy')(lastThree) >= 2) healthIssues.push('Lethargy noted on several recent days');
   if (energyTrend && energyTrend < 3) healthIssues.push('Low energy trend detected');
   if (averagePooCount && averagePooCount < 1) healthIssues.push('Low bowel movement frequency detected');
   if (averagePooCount && averagePooCount > 4) healthIssues.push('High bowel movement frequency detected');
@@ -56,6 +73,8 @@ function analyzeLogs(logs) {
     averagePeeCount: fixed(averagePeeCount, 1),
     averageFoodCount: fixed(averageFoodCount, 1),
     averageWaterCount: fixed(averageWaterCount, 1),
+    averageFood,
+    averageWater,
     healthIssues,
     totalLogs: logs.length,
   };

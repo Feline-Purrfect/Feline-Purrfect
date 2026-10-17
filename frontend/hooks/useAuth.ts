@@ -96,12 +96,7 @@ export function useConfirmSignUp() {
 export function useResendConfirmationCode() {
   return useMutation({
     mutationFn: (email: string) => authApi.resendConfirmationCode(email),
-    onSuccess: () => {
-      Alert.alert(
-        'Code Sent',
-        'A new verification code has been sent to your email.',
-      );
-    },
+    // No success alert: the screen restarts its countdown and says a new code was sent.
     onError: (error: any) => {
       console.error('Failed to resend code:', error);
       Alert.alert(
@@ -122,7 +117,9 @@ export function useSignIn() {
       // Fresh session: never show cats/logs cached from a previous account (the device may be shared).
       resetUserData(queryClient, response.user);
 
-      // Navigate to home
+      // Navigate to home, dropping the sign-in screens underneath (e.g. after a password reset) so
+      // Back can't return to them.
+      if (router.canDismiss()) router.dismissAll();
       router.replace('/(tabs)');
     },
     onError: (error: any, variables: SignInRequest) => {
@@ -131,7 +128,8 @@ export function useSignIn() {
       // The API returns NotAuthorizedException for a WRONG PASSWORD and UserNotConfirmedException for an
       // unverified email. These were swapped before, so a typo'd password sent users to the verify screen.
       if (error.code === 'NotAuthorizedException') {
-        Alert.alert('Sign In Failed', 'Invalid email or password.');
+        // Wrong email or password: the login screen shows this inline next to the fields.
+        return;
       } else if (error.code === 'UserNotConfirmedException') {
         Alert.alert(
           'Email Not Verified',
@@ -186,12 +184,7 @@ export function useSignOut() {
 export function useForgotPassword() {
   return useMutation({
     mutationFn: (email: string) => authApi.forgotPassword(email),
-    onSuccess: () => {
-      Alert.alert(
-        'Code Sent',
-        'A password reset code has been sent to your email.',
-      );
-    },
+    // No success alert: the screen moves on to the code entry (or restarts its resend countdown).
     onError: (error: any) => {
       console.error('Failed to send reset code:', error);
 
@@ -212,24 +205,48 @@ export function useForgotPassword() {
   });
 }
 
-// Confirm Forgot Password (Reset Password)
+// Verify Reset Code (step 1 of a password reset)
+export function useVerifyResetCode() {
+  return useMutation({
+    mutationFn: ({ email, code }: { email: string; code: string }) =>
+      authApi.verifyResetCode(email, code),
+    onError: (error: any) => {
+      console.error('Failed to verify reset code:', error);
+
+      if (error.code === 'CodeMismatchException') {
+        Alert.alert(
+          'Code didn’t work',
+          'That code is wrong or has expired. Check the latest email, or send a new code.',
+        );
+      } else if (error.code === 'LimitExceededException') {
+        Alert.alert(
+          'Too Many Attempts',
+          'You have exceeded the maximum number of attempts. Please try again later.',
+        );
+      } else {
+        Alert.alert(
+          'Verification Failed',
+          error.message || 'Unable to verify the code. Please try again.',
+        );
+      }
+    },
+  });
+}
+
+// Confirm Forgot Password (step 2 of a password reset)
 export function useConfirmForgotPassword() {
   return useMutation({
     mutationFn: ({
-      email,
-      code,
+      resetToken,
       newPassword,
     }: {
-      email: string;
-      code: string;
+      resetToken: string;
       newPassword: string;
-    }) => authApi.confirmForgotPassword(email, code, newPassword),
+    }) => authApi.confirmForgotPassword(resetToken, newPassword),
     onError: (error: any) => {
       console.error('Failed to reset password:', error);
 
-      if (error.code === 'CodeMismatchException') {
-        Alert.alert('Invalid Code', 'The reset code you entered is incorrect.');
-      } else if (error.code === 'ExpiredCodeException') {
+      if (error.code === 'ExpiredCodeException') {
         Alert.alert(
           'Code Expired',
           'Your reset code has expired. Please request a new one.',
@@ -237,7 +254,8 @@ export function useConfirmForgotPassword() {
       } else if (error.code === 'InvalidPasswordException') {
         Alert.alert(
           'Invalid Password',
-          'Password must be at least 8 characters with uppercase, lowercase, number, and special character.',
+          error.message ||
+            'Password must be at least 8 characters with uppercase, lowercase, number, and special character.',
         );
       } else {
         Alert.alert(
@@ -286,6 +304,25 @@ export function useChangePassword() {
           error.message || 'Unable to change password. Please try again.',
         );
       }
+    },
+  });
+}
+
+// Update Profile (name)
+export function useUpdateProfile() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (name: string) => authApi.updateProfile(name),
+    onSuccess: (updatedUser) => {
+      queryClient.setQueryData(AUTH_QUERY_KEY, updatedUser);
+    },
+    onError: (error: any) => {
+      console.error('Failed to update profile:', error);
+      Alert.alert(
+        'Couldn’t save',
+        error.message || 'Unable to update your profile. Please try again.',
+      );
     },
   });
 }

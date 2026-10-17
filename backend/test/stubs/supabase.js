@@ -1,4 +1,4 @@
-import { db, authResponses } from '../fakes.js';
+import { db, authResponses, storageCalls } from '../fakes.js';
 
 const fakeAuthClient = () => new Proxy({}, {
   get: (_t, group) => (group === 'auth'
@@ -10,9 +10,20 @@ const fakeAuthClient = () => new Proxy({}, {
     : undefined),
 });
 
+// Tests can override admin calls through authResponses.adminGetUser / adminUpdateUserById / adminSignOut.
 const adminAuth = {
-  getUser: async () => ({ data: { user: null }, error: { message: 'bad' } }),
-  admin: { updateUserById: async () => ({ error: null }), deleteUser: async () => ({ error: null }) },
+  getUser: async (...args) => (typeof authResponses.adminGetUser === 'function'
+    ? authResponses.adminGetUser(...args)
+    : authResponses.adminGetUser ?? { data: { user: null }, error: { message: 'bad' } }),
+  admin: {
+    updateUserById: async (...args) => (typeof authResponses.adminUpdateUserById === 'function'
+      ? authResponses.adminUpdateUserById(...args)
+      : authResponses.adminUpdateUserById ?? { error: null }),
+    deleteUser: async () => ({ error: null }),
+    signOut: async (...args) => (typeof authResponses.adminSignOut === 'function'
+      ? authResponses.adminSignOut(...args)
+      : { error: null }),
+  },
 };
 
 export const admin = {
@@ -20,9 +31,9 @@ export const admin = {
   auth: adminAuth,
   storage: {
     from: () => ({
-      createSignedUrls: async () => ({ data: [], error: null }),
-      remove: async () => ({ error: null }),
-      upload: async () => ({ error: null }),
+      createSignedUrls: async (paths) => ({ data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}` })), error: null }),
+      remove: async (paths) => { storageCalls.removed.push(...paths); return { error: null }; },
+      upload: async (path) => { storageCalls.uploaded.push(path); return { error: null }; },
     }),
   },
 };

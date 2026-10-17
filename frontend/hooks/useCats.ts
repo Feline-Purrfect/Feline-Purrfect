@@ -3,99 +3,172 @@ import { CatResponse } from '@/types/cat';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Alert } from 'react-native';
 
-const CATS_QUERY_KEY = ['cats'];
+// Query keys. Everything lives under ['cats'] so one invalidation refreshes every cat view.
+export const catKeys = {
+  all: ['cats'] as const,
+  active: ['cats', 'list', 'active'] as const,
+  archived: ['cats', 'list', 'archived'] as const,
+  detail: (catId: string) => ['cats', 'detail', catId] as const,
+  photos: (catId: string) => ['cats', 'photos', catId] as const,
+  photosOn: (catId: string, date: string) =>
+    ['cats', 'photos', catId, date] as const,
+  recentPhotos: ['cats', 'photos', 'recent'] as const,
+};
 
-// Get all cats
+const DASHBOARD_KEY = ['dashboard', 'analytics'];
+
+const showError = (title: string) => (error: any) => {
+  console.error(title, error);
+  Alert.alert(title, error?.message || 'Please try again.');
+};
+
+// ------------------------------------------------------------------ queries
+/** Active cats (My cats, Home, Logs). */
 export function useCats() {
   return useQuery({
-    queryKey: CATS_QUERY_KEY,
-    queryFn: catsApi.getCats,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    queryKey: catKeys.active,
+    queryFn: () => catsApi.getCats(),
+    staleTime: 1000 * 60 * 5,
   });
 }
 
-// Get single cat
-export function useCat(catId: string) {
+export function useArchivedCats() {
   return useQuery({
-    queryKey: [...CATS_QUERY_KEY, catId],
+    queryKey: catKeys.archived,
+    queryFn: () => catsApi.getCats({ archived: true }),
+    staleTime: 1000 * 60 * 5,
+  });
+}
+
+/** One cat. Renders instantly from the list cache, then refreshes from the API. */
+export function useCat(catId: string) {
+  const queryClient = useQueryClient();
+  return useQuery({
+    queryKey: catKeys.detail(catId),
     queryFn: () => catsApi.getCat(catId),
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    enabled: !!catId,
+    staleTime: 1000 * 30,
+    placeholderData: () =>
+      queryClient
+        .getQueryData<CatResponse[]>(catKeys.active)
+        ?.find((c) => c.catId === catId) ??
+      queryClient
+        .getQueryData<CatResponse[]>(catKeys.archived)
+        ?.find((c) => c.catId === catId),
+  });
+}
+
+export function useCatPhotos(catId: string) {
+  return useQuery({
+    queryKey: catKeys.photos(catId),
+    queryFn: () => catsApi.getCatPhotos(catId),
     enabled: !!catId,
   });
 }
 
-// Add a cat
-export function useAddCat() {
+/** One cat's photos from one day (shown on that day's log). */
+export function useCatPhotosOn(catId: string, date: string) {
+  return useQuery({
+    queryKey: catKeys.photosOn(catId, date),
+    // Filter here too: a backend without the ?on= filter returns every photo, which made old photos
+    // show up on every day's log.
+    queryFn: async () =>
+      (
+        await catsApi.getCatPhotos(catId, { on: date, limit: 12 })
+      ).photos.filter((p) => p.takenOn === date),
+    enabled: !!catId && !!date,
+  });
+}
+
+export function useRecentPhotos(limit = 3) {
+  return useQuery({
+    queryKey: [...catKeys.recentPhotos, limit],
+    queryFn: () => catsApi.getRecentPhotos(limit),
+  });
+}
+
+// ------------------------------------------------------------------ mutations
+/** Write a fresh cat into the detail cache and refetch every list. */
+function useSyncCat() {
   const queryClient = useQueryClient();
-  
+  return (cat?: CatResponse) => {
+    if (cat) queryClient.setQueryData(catKeys.detail(cat.catId), cat);
+    queryClient.invalidateQueries({ queryKey: catKeys.all });
+    queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY });
+  };
+}
+
+export function useAddCat() {
+  const sync = useSyncCat();
   return useMutation({
     mutationFn: catsApi.addCat,
-    onSuccess: (newCat) => {
-      // Add the returned cat to cache
-      queryClient.setQueryData<CatResponse[]>(CATS_QUERY_KEY, (old = []) => [
-        ...old,
-        newCat,
-      ]);
-      
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-      Alert.alert('Success', 'Cat added successfully!');
-    },
-    onError: (error: any) => {
-      console.error('Failed to add cat:', error);
-      Alert.alert('Error', error.message || 'Failed to add cat');
-    },
+    onSuccess: (cat) => sync(cat),
+    onError: showError('Couldn’t add this cat'),
   });
 }
 
-// Update a cat
 export function useUpdateCat() {
-  const queryClient = useQueryClient();
-  
+  const sync = useSyncCat();
   return useMutation({
     mutationFn: catsApi.updateCat,
-    onMutate: async (updatedCat) => {
-      await queryClient.cancelQueries({ queryKey: CATS_QUERY_KEY });
-      const previousCats = queryClient.getQueryData<CatResponse[]>(CATS_QUERY_KEY);
-      
-      // Optimistically update cache
-      queryClient.setQueryData<CatResponse[]>(CATS_QUERY_KEY, (old = []) =>
-        old.map(cat => cat.catId === updatedCat.catId ? { ...cat, ...updatedCat } : cat)
-      );
-      
-      return { previousCats };
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-      Alert.alert('Success', 'Cat updated successfully!');
-    },
-    onError: (err: any, updatedCat, context) => {
-      // Rollback on error
-      if (context?.previousCats) {
-        queryClient.setQueryData<CatResponse[]>(CATS_QUERY_KEY, context.previousCats);
-      }
-      console.error('Failed to update cat:', err);
-      Alert.alert('Error', err.message || 'Failed to update cat');
-    },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: CATS_QUERY_KEY });
-    },
+    onSuccess: (cat) => sync(cat),
+    onError: showError('Couldn’t save your changes'),
   });
 }
 
-// Delete a cat
+export function useArchiveCat() {
+  const sync = useSyncCat();
+  return useMutation({
+    mutationFn: catsApi.archiveCat,
+    onSuccess: (cat) => sync(cat),
+    onError: showError('Couldn’t archive this cat'),
+  });
+}
+
+export function useUnarchiveCat() {
+  const sync = useSyncCat();
+  return useMutation({
+    mutationFn: catsApi.unarchiveCat,
+    onSuccess: (cat) => sync(cat),
+    onError: showError('Couldn’t restore this cat'),
+  });
+}
+
 export function useDeleteCat() {
   const queryClient = useQueryClient();
-  
   return useMutation({
     mutationFn: catsApi.deleteCat,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: CATS_QUERY_KEY });
-      queryClient.invalidateQueries({ queryKey: ['dashboard', 'analytics'] });
-      Alert.alert('Success', 'Cat removed successfully');
+    onSuccess: (_, catId) => {
+      queryClient.removeQueries({ queryKey: catKeys.detail(catId) });
+      queryClient.removeQueries({ queryKey: catKeys.photos(catId) });
+      queryClient.invalidateQueries({ queryKey: catKeys.all });
+      queryClient.invalidateQueries({ queryKey: ['logs'] });
+      queryClient.invalidateQueries({ queryKey: DASHBOARD_KEY });
     },
-    onError: (error: any) => {
-      console.error('Failed to delete cat:', error);
-      Alert.alert('Error', error.message || 'Failed to delete cat');
+    onError: showError('Couldn’t delete this cat'),
+  });
+}
+
+export function useAddCatPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: catsApi.addCatPhoto,
+    onSuccess: (photo) => {
+      queryClient.invalidateQueries({ queryKey: catKeys.photos(photo.catId) });
+      queryClient.invalidateQueries({ queryKey: catKeys.recentPhotos });
     },
+    onError: showError('Couldn’t upload that photo'),
+  });
+}
+
+export function useDeleteCatPhoto() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: catsApi.deleteCatPhoto,
+    onSuccess: (_, { catId }) => {
+      queryClient.invalidateQueries({ queryKey: catKeys.photos(catId) });
+      queryClient.invalidateQueries({ queryKey: catKeys.recentPhotos });
+    },
+    onError: showError('Couldn’t delete that photo'),
   });
 }

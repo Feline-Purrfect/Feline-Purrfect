@@ -1,143 +1,163 @@
-import { CustomButton } from '@/components/common/CustomButton';
-import { useSignIn } from '@/hooks/useAuth';
-import FontAwesome6 from '@expo/vector-icons/FontAwesome6';
-import { Link, router } from 'expo-router';
-import { useState } from 'react';
 import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+  AuthBanner,
+  AuthLayout,
+  FooterPrompt,
+} from '@/components/auth/AuthLayout';
+import { PasswordField } from '@/components/auth/PasswordField';
+import { Button, Field, Text, TextField } from '@/components/ds';
+import { Colors } from '@/constants/colors';
+import { useSignIn } from '@/hooks/useAuth';
+import { isEmail } from '@/lib/password';
+import Feather from '@expo/vector-icons/Feather';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useRef, useState } from 'react';
+import { Pressable, TextInput, View } from 'react-native';
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('');
+  // `verified=1` + `email` arrive from Verify email; `email` alone from a reset that couldn't log in.
+  const params = useLocalSearchParams<{ email?: string; verified?: string }>();
+  const [email, setEmail] = useState(params.email ?? '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  const passwordRef = useRef<TextInput>(null);
 
   const { mutate: signIn, isPending } = useSignIn();
 
-  const handleLogin = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please enter both email and password');
+  const ready = email.trim().length > 0 && password.length > 0;
+
+  const submit = () => {
+    if (!ready || isPending) return;
+    if (!isEmail(email)) {
+      setEmailError('Enter a valid email address.');
       return;
     }
-
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      Alert.alert('Error', 'Please enter a valid email address');
-      return;
-    }
-
-    signIn({
-      email: email.trim().toLowerCase(),
-      password,
-    });
+    setFailed(false);
+    // Success navigates (useSignIn). A wrong email/password is shown inline; other errors alert.
+    signIn(
+      { email: email.trim().toLowerCase(), password },
+      {
+        onError: (error: any) => {
+          if (error.code === 'NotAuthorizedException') setFailed(true);
+        },
+      },
+    );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        className="flex-1"
-      >
-        <ScrollView
-          className="flex-1"
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-        >
-          <View className="flex-1 justify-center px-6 py-8">
-            {/* Logo/Icon */}
-            <View className="items-center mb-8">
-              <View className="w-20 h-20 bg-primary-100 rounded-full items-center justify-center mb-4">
-                <FontAwesome6 name="cat" size={40} color="#155C8D" />
-              </View>
-              <Text className="text-3xl font-bold text-black">
-                Welcome to Feline Purrfect
-              </Text>
-              <Text className="text-gray mt-2">Sign in to continue</Text>
-            </View>
+    <AuthLayout
+      title="Welcome back"
+      subtitle="Log in to see your cats and today’s logs."
+      footer={
+        <FooterPrompt
+          prompt="New to Feline Purrfect?"
+          action="Create an account"
+          onPress={() => router.push('/signup')}
+        />
+      }
+    >
+      <View className="gap-[18px]">
+        {failed ? (
+          <AuthBanner
+            tone="danger"
+            icon={
+              <Feather
+                name="alert-circle"
+                size={18}
+                color={Colors.dangerInk}
+                style={{ marginTop: 1 }}
+              />
+            }
+          >
+            That email and password don’t match. Try again or reset your
+            password.
+          </AuthBanner>
+        ) : params.verified === '1' ? (
+          <AuthBanner
+            tone="success"
+            icon={
+              <Feather
+                name="check-circle"
+                size={18}
+                color={Colors.primary.pressed}
+                style={{ marginTop: 1 }}
+              />
+            }
+          >
+            Your email is verified. Log in to get started.
+          </AuthBanner>
+        ) : null}
 
-            {/* Email Input */}
-            <View className="mb-4">
-              <Text className="text-gray-700 font-semibold mb-2">Email</Text>
-              <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                <FontAwesome6 name="envelope" size={16} color="#9ca3af" />
-                <TextInput
-                  value={email}
-                  onChangeText={setEmail}
-                  placeholder="your@email.com"
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoComplete="email"
-                  className="flex-1 ml-3 text-gray-800"
-                />
-              </View>
-            </View>
+        <Field label="Email" error={emailError}>
+          <TextField
+            value={email}
+            onChangeText={(t) => {
+              setEmail(t);
+              setEmailError(null);
+              setFailed(false);
+            }}
+            placeholder="you@example.com"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoCorrect={false}
+            autoComplete="email"
+            textContentType="emailAddress"
+            returnKeyType="next"
+            onSubmitEditing={() => passwordRef.current?.focus()}
+            submitBehavior="submit"
+            invalid={!!emailError || failed}
+            accessibilityLabel="Email"
+          />
+        </Field>
 
-            {/* Password Input */}
-            <View className="mb-2">
-              <Text className="text-gray-700 font-semibold mb-2">Password</Text>
-              <View className="flex-row items-center bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
-                <FontAwesome6 name="lock" size={16} color="#9ca3af" />
-                <TextInput
-                  value={password}
-                  onChangeText={setPassword}
-                  placeholder="Enter your password"
-                  secureTextEntry={!showPassword}
-                  autoCapitalize="none"
-                  autoComplete="password"
-                  className="flex-1 ml-3 text-gray-800"
-                />
-                <TouchableOpacity
-                  onPress={() => setShowPassword(!showPassword)}
-                >
-                  <FontAwesome6
-                    name={showPassword ? 'eye' : 'eye-slash'}
-                    size={16}
-                    color="#9ca3af"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Forgot Password Link */}
-            <TouchableOpacity
-              onPress={() => router.push('/forgot-password')}
-              className="self-end mb-6"
+        <View className="gap-1.5">
+          <View className="flex-row items-baseline justify-between">
+            <Text variant="label">Password</Text>
+            <Pressable
+              onPress={() =>
+                router.push({
+                  pathname: '/forgot-password',
+                  params: email.trim()
+                    ? { email: email.trim().toLowerCase() }
+                    : {},
+                })
+              }
+              accessibilityRole="link"
+              hitSlop={8}
+              className="py-1"
             >
-              <Text className="text-primary-600 font-semibold">
-                Forgot Password?
+              <Text variant="label" className="text-primary">
+                Forgot password?
               </Text>
-            </TouchableOpacity>
-
-            {/* Login Button */}
-            <CustomButton
-              content={isPending ? 'Signing in...' : 'Sign In'}
-              onPress={handleLogin}
-              disabled={isPending}
-            />
-
-            {/* Sign Up Link */}
-            <View className="flex-row justify-center mt-6">
-              <Text className="text-gray-600">{`Don't have an account? `}</Text>
-              <Link href="/signup" asChild>
-                <TouchableOpacity>
-                  <Text className="text-primary-600 font-semibold">
-                    Sign Up
-                  </Text>
-                </TouchableOpacity>
-              </Link>
-            </View>
+            </Pressable>
           </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+          <PasswordField
+            ref={passwordRef}
+            value={password}
+            onChangeText={(t) => {
+              setPassword(t);
+              setFailed(false);
+            }}
+            visible={showPassword}
+            onToggle={() => setShowPassword((v) => !v)}
+            autoComplete="current-password"
+            textContentType="password"
+            returnKeyType="go"
+            onSubmitEditing={submit}
+            invalid={failed}
+            accessibilityLabel="Password"
+          />
+        </View>
+
+        <Button
+          title="Log in"
+          onPress={submit}
+          disabled={!ready}
+          loading={isPending}
+          className="h-[52px] mt-1.5"
+        />
+      </View>
+    </AuthLayout>
   );
 }

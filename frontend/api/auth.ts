@@ -47,8 +47,13 @@ export const authApi = {
   forgotPassword: (email: string): Promise<void> =>
     publicAuth('/auth/forgot-password', { email }, 'ForgotPasswordError', 'Failed to send reset code'),
 
-  confirmForgotPassword: (email: string, code: string, newPassword: string): Promise<void> =>
-    publicAuth('/auth/reset-password', { email, code, newPassword }, 'ResetPasswordError', 'Failed to reset password'),
+  /** Step 1 of a reset: checks the emailed code and returns a one-purpose token for step 2. */
+  verifyResetCode: (email: string, code: string): Promise<{ resetToken: string }> =>
+    publicAuth('/auth/verify-reset-code', { email, code }, 'VerifyResetCodeError', 'Failed to verify code'),
+
+  /** Step 2 of a reset: sets the new password with the token from verifyResetCode. */
+  confirmForgotPassword: (resetToken: string, newPassword: string): Promise<void> =>
+    publicAuth('/auth/reset-password', { resetToken, newPassword }, 'ResetPasswordError', 'Failed to reset password'),
 
   changePassword: (oldPassword: string, newPassword: string): Promise<void> =>
     apiFetch('/auth/change-password', {
