@@ -29,6 +29,12 @@ services:
         value: "0.1"
       - key: CORS_ORIGINS
         value: ""
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ASK_MODEL
+        value: claude-haiku-5-5
+      - key: ASK_DAILY_LIMIT
+        value: "30"
 
   - type: cron
     name: feline-purrfect-missing-logs

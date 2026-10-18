@@ -14,7 +14,7 @@
     "job:check-missing-logs": "node --import ./src/instrument.js src/jobs/checkMissingLogs.js",
     "job:check-missing-logs:local": "node --env-file=.env --import ./src/instrument.js src/jobs/checkMissingLogs.js",
     "lint:syntax": "find src scripts test -name '*.js' -print0 | xargs -0 -n1 node --check",
-    "test": "node --import ./test/setup.js --test test/routes.test.js"
+    "test": "node --import ./test/setup.js --test test/routes.test.js test/ask.test.js"
   },
   "dependencies": {
     "@sentry/node": "^9.47.2",

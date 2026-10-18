@@ -8,5 +8,6 @@ process.env.SUPABASE_URL = 'https://example.supabase.co';
 process.env.SUPABASE_ANON_KEY = 'anon-key-anon-key-anon-key';
 process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key-service-key-service';
 process.env.LOG_LEVEL = 'silent';
+process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'; // Ask routes; the API itself is replaced in tests
 
 register('./hooks.js', import.meta.url);

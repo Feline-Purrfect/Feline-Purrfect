@@ -1,9 +1,12 @@
 // Shared in-memory state used by both the Supabase stub (test/stubs/supabase.js) and the tests.
 // ------------------------------------------------------------ in-memory database
-const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'] };
+const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'], ask_threads: ['thread_id'], ask_messages: ['message_id'] };
+
+// Not-null columns with defaults, checked when a row explicitly carries null.
+const NOT_NULL = { ask_messages: ['emergency'] };
 
 function createDb() {
-  const tables = { cats: [], cat_photos: [], logs: [], device_tokens: [] };
+  const tables = { cats: [], cat_photos: [], logs: [], device_tokens: [], ask_threads: [], ask_messages: [] };
 
   class Query {
     constructor(table) { this.table = table; this.op = 'select'; this.filters = []; this.lim = null; this.orders = []; this.rng = null; this.wantCount = false; }
@@ -30,8 +33,17 @@ function createDb() {
       const now = new Date().toISOString();
       let out;
       if (this.op === 'insert') {
-        const row = { created_at: now, updated_at: now, ...this.payload };
-        rows.push(row); out = [row];
+        const payload = Array.isArray(this.payload) ? this.payload : [this.payload];
+        // Like PostgREST: in a multi-row insert, a column missing from one row is sent as null.
+        const cols = [...new Set(payload.flatMap((p) => Object.keys(p)))];
+        const filled = payload.length > 1 ? payload.map((p) => Object.fromEntries(cols.map((c) => [c, p[c] ?? null]))) : payload;
+        for (const p of filled) {
+          for (const c of NOT_NULL[this.table] ?? []) {
+            if (c in p && p[c] === null) throw Object.assign(new Error(`null value in column "${c}" violates not-null constraint`), { code: '23502' });
+          }
+        }
+        out = filled.map((p) => ({ created_at: now, updated_at: now, ...p }));
+        rows.push(...out);
       } else if (this.op === 'upsert') {
         const keys = PK[this.table];
         const existing = rows.find((r) => keys.every((k) => r[k] === this.payload[k]));

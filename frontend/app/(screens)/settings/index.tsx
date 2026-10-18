@@ -1,11 +1,12 @@
 import { AuthGuard } from '@/components/common/AuthGuard';
-import { Button, Text } from '@/components/ds';
+import { Button, Divider, Text } from '@/components/ds';
 import {
   SettingsRow,
   SettingsSection,
 } from '@/components/settings/SettingsRow';
 import { UserAvatar } from '@/components/settings/UserAvatar';
 import { Colors } from '@/constants/colors';
+import { useAskConsent, useAskStatus } from '@/hooks/useAsk';
 import { useAuth, useSignOut } from '@/hooks/useAuth';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
@@ -37,6 +38,33 @@ export default function SettingsScreen() {
         },
       ],
     );
+
+  const askStatus = useAskStatus();
+  const askConsent = useAskConsent();
+  const sharing = askStatus.data?.consented;
+
+  const aiSharing = () =>
+    sharing
+      ? Alert.alert(
+          'Turn off AI data sharing?',
+          'Ask won’t send anything to the AI service until you allow it again. Your saved chats stay until you delete them.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Turn off',
+              style: 'destructive',
+              onPress: () => askConsent.mutate(false),
+            },
+          ],
+        )
+      : Alert.alert(
+          'AI data sharing is off',
+          'Ask will ask for your permission the next time you send a question.',
+          [
+            { text: 'OK', style: 'cancel' },
+            { text: 'Open Ask', onPress: () => router.navigate('/ask') },
+          ],
+        );
 
   return (
     <AuthGuard>
@@ -77,6 +105,13 @@ export default function SettingsScreen() {
             icon="bell"
             label="Notifications"
             onPress={() => comingSoon('Notification settings')}
+          />
+          <Divider className="ml-[50px]" />
+          <SettingsRow
+            icon="message-circle"
+            label="AI data sharing"
+            value={sharing === undefined ? undefined : sharing ? 'On' : 'Off'}
+            onPress={aiSharing}
           />
         </SettingsSection>
 

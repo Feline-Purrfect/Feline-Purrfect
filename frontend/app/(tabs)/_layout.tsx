@@ -2,6 +2,7 @@ import { AuthGuard } from '@/components/common/AuthGuard';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/theme';
 import {
+  Ionicons as AskIcon,
   Entypo as HomeIcon,
   Ionicons as LogsIcon,
   FontAwesome6 as MyCatsIcon,
@@ -51,6 +52,21 @@ export default function TabLayout() {
               <LogsIcon name="analytics-sharp" color={color} size={size} />
             ),
             headerShown: false, // the screen draws its own large title and week strip
+          }}
+        />
+        <Tabs.Screen
+          name="ask"
+          options={{
+            title: 'Ask',
+            tabBarLabel: 'Ask',
+            tabBarIcon: ({ color, size }) => (
+              <AskIcon
+                name="chatbubble-ellipses-sharp"
+                color={color}
+                size={size}
+              />
+            ),
+            headerShown: false, // the screen draws its own large title and chat buttons
           }}
         />
         <Tabs.Screen

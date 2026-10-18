@@ -16,6 +16,7 @@ import catsRoutes from './routes/cats.js';
 import logsRoutes from './routes/logs.js';
 import dashboardRoutes from './routes/dashboard.js';
 import devicesRoutes from './routes/devices.js';
+import askRoutes from './routes/ask.js';
 
 function createApp() {
   const app = express();
@@ -60,12 +61,19 @@ function createApp() {
     message: { code: 'LimitExceededException', message: 'Too many attempts. Please try again later.' },
   });
 
+  // Ask calls a paid AI API: a short burst limit here, plus a per-user daily quota in the route.
+  const askLimiter = rateLimit({
+    windowMs: 60 * 1000, limit: 12, standardHeaders: 'draft-7', legacyHeaders: false,
+    message: { code: 'LimitExceededException', message: 'You’re asking quickly. Wait a moment and try again.' },
+  });
+
   app.use(general);
   app.use('/auth', authLimiter, jsonSmall, authRoutes);
   app.use('/cats', jsonPhoto, catsRoutes);
   app.use('/logs', jsonSmall, logsRoutes);
   app.use('/dashboard', dashboardRoutes);
   app.use('/devices', jsonSmall, devicesRoutes);
+  app.use('/ask', askLimiter, jsonSmall, askRoutes);
 
   // Sentry smoke test (dev only). Must be registered before the 404 handler or it is unreachable.
   if (!config.isProd) {
