@@ -144,12 +144,29 @@ drop trigger if exists device_tokens_set_updated_at on public.device_tokens;
 create trigger device_tokens_set_updated_at before update on public.device_tokens
   for each row execute function public.set_updated_at();
 
+-- ---------------------------------------------------------------- notification settings
+-- Daily log reminder: one row per user, created when the app first registers a device or the user
+-- opens the setting. Sent at most once a day at `remind_at` in the user's own time zone.
+create table if not exists public.notification_settings (
+  user_id           uuid primary key references auth.users(id) on delete cascade,
+  daily_reminder    boolean not null default true,
+  remind_at         time not null default '23:00',          -- wall-clock time in `timezone`
+  timezone          text not null default 'UTC' check (char_length(timezone) between 1 and 64), -- IANA name
+  last_reminded_on  date,                                   -- local day of the last reminder the job handled
+  created_at        timestamptz not null default now(),
+  updated_at        timestamptz not null default now()
+);
+create index if not exists notification_settings_enabled_idx on public.notification_settings (user_id) where daily_reminder;
+drop trigger if exists notification_settings_set_updated_at on public.notification_settings;
+create trigger notification_settings_set_updated_at before update on public.notification_settings
+  for each row execute function public.set_updated_at();
+
 -- ---------------------------------------------------------------- reminder query (used by the cron job)
-create or replace function public.cats_missing_log(day date)
+create or replace function public.cats_missing_log_for(day date, user_ids uuid[])
 returns table (user_id uuid, cat_id uuid, name text, total_cats integer)
 language sql stable security definer set search_path = public as $$
   with active as (
-    select * from public.cats where archived_at is null
+    select * from public.cats where archived_at is null and user_id = any(user_ids)
   ), totals as (
     select a.user_id, count(*)::int as total from active a group by a.user_id
   )
@@ -163,8 +180,8 @@ language sql stable security definer set search_path = public as $$
   )
   order by a.user_id, a.created_at;
 $$;
-revoke all on function public.cats_missing_log(date) from public, anon, authenticated;
-grant execute on function public.cats_missing_log(date) to service_role;
+revoke all on function public.cats_missing_log_for(date, uuid[]) from public, anon, authenticated;
+grant execute on function public.cats_missing_log_for(date, uuid[]) to service_role;
 
 -- ---------------------------------------------------------------- security
 -- The API server talks to Postgres with the service-role key (bypasses RLS) and enforces
@@ -174,6 +191,7 @@ alter table public.cats          enable row level security;
 alter table public.cat_photos    enable row level security;
 alter table public.logs          enable row level security;
 alter table public.device_tokens enable row level security;
+alter table public.notification_settings enable row level security;
 alter table public.ask_threads   enable row level security;
 alter table public.ask_messages  enable row level security;
 

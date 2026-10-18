@@ -4,15 +4,15 @@ services:
   - type: web
     name: feline-purrfect-api
     runtime: node
-    region: virginia            # closest to your old us-east-1; keep Supabase in us-east-1 too
-    plan: starter               # free instances sleep after 15 min idle — see README before using free for the App Store
-    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    region: virginia # closest to your old us-east-1; keep Supabase in us-east-1 too
+    plan: starter # free instances sleep after 15 min idle — see README before using free for the App Store
+    buildCommand: npm install --omit=dev # switch to `npm ci --omit=dev` once package-lock.json is committed
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: NODE_ENV
         value: production
       - key: SUPABASE_URL
@@ -26,15 +26,17 @@ services:
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_TRACES_SAMPLE_RATE
-        value: "0.1"
+        value: '0.1'
       - key: CORS_ORIGINS
-        value: ""
+        value: ''
+      - key: NOTIFICATION_TESTER_IDS
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ASK_MODEL
         value: claude-haiku-5-5
       - key: ASK_DAILY_LIMIT
-        value: "30"
+        value: '30'
       - key: LEGAL_OPERATOR_NAME
         sync: false
       - key: LEGAL_CONTACT_EMAIL
@@ -45,12 +47,12 @@ services:
     runtime: node
     region: virginia
     plan: starter
-    schedule: "30 23 * * *"     # 23:30 UTC daily — identical to the old EventBridge rule
-    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    schedule: '*/5 * * * *' # every 5 min: each user's reminder goes out at their own time (default 23:00 local), once a day
+    buildCommand: npm install --omit=dev # switch to `npm ci --omit=dev` once package-lock.json is committed
     startCommand: npm run job:check-missing-logs
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: NODE_ENV
         value: production
       - key: SUPABASE_URL

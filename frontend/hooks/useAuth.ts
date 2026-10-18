@@ -1,5 +1,6 @@
 import { authApi } from '@/api/auth';
 import { AUTH_QUERY_KEY } from '@/lib/api/client';
+import { forgetPushToken, unregisterFromReminders } from '@/lib/notifications';
 import { AuthUser, SignInRequest, SignUpRequest } from '@/types/auth';
 import { QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
@@ -168,7 +169,14 @@ export function useSignOut() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: authApi.signOut,
+    mutationFn: async () => {
+      // Stop this phone getting the signed-out user's reminders. Needs the session, so it goes first;
+      // a network failure must not block signing out.
+      await unregisterFromReminders().catch((err) =>
+        console.warn('Failed to unregister push token:', err),
+      );
+      await authApi.signOut();
+    },
     onSuccess: () => {
       resetUserData(queryClient, null);
       router.replace('/(auth)/login');
@@ -334,6 +342,7 @@ export function useDeleteAccount() {
   return useMutation({
     mutationFn: () => authApi.deleteAccount(),
     onSuccess: () => {
+      forgetPushToken(); // the server deleted the device with the account
       resetUserData(queryClient, null);
       router.replace('/(auth)/login');
 

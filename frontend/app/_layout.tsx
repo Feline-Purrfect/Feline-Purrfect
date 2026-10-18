@@ -1,6 +1,7 @@
 import { Colors } from '@/constants/colors';
 import { Fonts, fontAssets } from '@/constants/theme';
 import '@/lib/nativewind-interop';
+import '@/lib/notifications'; // registers the foreground notification handler
 import { useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -129,6 +130,10 @@ export default Sentry.wrap(function RootLayout() {
           <Stack.Screen
             name="(screens)/settings/account"
             options={{ title: 'Account' }}
+          />
+          <Stack.Screen
+            name="(screens)/settings/notifications"
+            options={{ title: 'Notifications' }}
           />
         </Stack>
         <StatusBar style="dark" />

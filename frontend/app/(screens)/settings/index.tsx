@@ -8,7 +8,9 @@ import { UserAvatar } from '@/components/settings/UserAvatar';
 import { Colors } from '@/constants/colors';
 import { useAskConsent, useAskStatus } from '@/hooks/useAsk';
 import { useAuth, useSignOut } from '@/hooks/useAuth';
+import { useNotificationSettings, usePushPermission } from '@/hooks/useNotifications';
 import { openLegal } from '@/lib/legal';
+import { formatReminderTime } from '@/lib/notifications';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -16,10 +18,6 @@ import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
-
-// Notification settings get their own screen later.
-const comingSoon = (what: string) =>
-  Alert.alert('Coming soon', `${what} will be available soon.`);
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -39,6 +37,14 @@ export default function SettingsScreen() {
         },
       ],
     );
+
+  const reminders = useNotificationSettings();
+  const pushPermission = usePushPermission();
+  const reminderValue = !reminders.data
+    ? undefined
+    : !reminders.data.dailyReminder || pushPermission.data === 'denied'
+      ? 'Off'
+      : formatReminderTime(reminders.data.remindAt);
 
   const askStatus = useAskStatus();
   const askConsent = useAskConsent();
@@ -105,7 +111,8 @@ export default function SettingsScreen() {
           <SettingsRow
             icon="bell"
             label="Notifications"
-            onPress={() => comingSoon('Notification settings')}
+            value={reminderValue}
+            onPress={() => router.push('/settings/notifications')}
           />
           <Divider className="ml-[50px]" />
           <SettingsRow

@@ -1,12 +1,12 @@
 // Shared in-memory state used by both the Supabase stub (test/stubs/supabase.js) and the tests.
 // ------------------------------------------------------------ in-memory database
-const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'], ask_threads: ['thread_id'], ask_messages: ['message_id'] };
+const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'], notification_settings: ['user_id'], ask_threads: ['thread_id'], ask_messages: ['message_id'] };
 
 // Not-null columns with defaults, checked when a row explicitly carries null.
 const NOT_NULL = { ask_messages: ['emergency'] };
 
 function createDb() {
-  const tables = { cats: [], cat_photos: [], logs: [], device_tokens: [], ask_threads: [], ask_messages: [] };
+  const tables = { cats: [], cat_photos: [], logs: [], device_tokens: [], notification_settings: [], ask_threads: [], ask_messages: [] };
 
   class Query {
     constructor(table) { this.table = table; this.op = 'select'; this.filters = []; this.lim = null; this.orders = []; this.rng = null; this.wantCount = false; }
@@ -75,7 +75,18 @@ function createDb() {
     then(resolve, reject) { try { resolve(this.run()); } catch (e) { reject(e); } }
   }
 
-  return { tables, from: (t) => new Query(t) };
+  // Postgres functions the API calls through admin.rpc(), re-implemented over the in-memory tables.
+  const rpcs = {
+    cats_missing_log_for({ day, user_ids: userIds }) {
+      const active = tables.cats.filter((c) => c.archived_at == null && userIds.includes(c.user_id));
+      const total = (uid) => active.filter((c) => c.user_id === uid).length;
+      const finished = (c) => tables.logs.some((l) => l.cat_id === c.cat_id && l.log_date === day && l.food_amount != null && l.water_amount != null);
+      return active.filter((c) => !finished(c)).map((c) => ({ user_id: c.user_id, cat_id: c.cat_id, name: c.name, total_cats: total(c.user_id) }));
+    },
+  };
+  const rpc = async (fn, args) => (rpcs[fn] ? { data: rpcs[fn](args), error: null } : { data: null, error: { message: `fake: no rpc ${fn}` } });
+
+  return { tables, from: (t) => new Query(t), rpc };
 }
 
 export const db = createDb();
