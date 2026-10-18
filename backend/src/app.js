@@ -17,6 +17,7 @@ import logsRoutes from './routes/logs.js';
 import dashboardRoutes from './routes/dashboard.js';
 import devicesRoutes from './routes/devices.js';
 import askRoutes from './routes/ask.js';
+import legalRoutes from './routes/legal.js';
 
 function createApp() {
   const app = express();
@@ -48,6 +49,8 @@ function createApp() {
 
   // Health endpoints sit before rate limiting so monitors are never throttled.
   app.use(healthRoutes);
+  // Terms of Use and Privacy Policy: public pages, also linked from the store listings.
+  app.use(legalRoutes);
 
   const jsonSmall = express.json({ limit: '100kb' });
   const jsonPhoto = express.json({ limit: '8mb' }); // cats carry a base64 photo

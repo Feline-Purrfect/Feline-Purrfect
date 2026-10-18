@@ -35,6 +35,10 @@ services:
         value: claude-haiku-5-5
       - key: ASK_DAILY_LIMIT
         value: "30"
+      - key: LEGAL_OPERATOR_NAME
+        sync: false
+      - key: LEGAL_CONTACT_EMAIL
+        sync: false
 
   - type: cron
     name: feline-purrfect-missing-logs

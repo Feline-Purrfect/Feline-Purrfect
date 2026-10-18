@@ -1,8 +1,9 @@
 import { AuthLayout, FooterPrompt } from '@/components/auth/AuthLayout';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { PasswordRules } from '@/components/auth/PasswordRules';
-import { Button, Field, TextField } from '@/components/ds';
+import { Button, Field, Text, TextField } from '@/components/ds';
 import { useSignUp } from '@/hooks/useAuth';
+import { openLegal } from '@/lib/legal';
 import { isEmail, passwordRules } from '@/lib/password';
 import { router } from 'expo-router';
 import { useRef, useState } from 'react';
@@ -144,6 +145,28 @@ export default function SignupScreen() {
           loading={isPending}
           className="h-[52px] mt-1.5"
         />
+
+        <Text variant="caption" className="text-center leading-[19px] px-2">
+          By creating an account, you agree to our{' '}
+          <Text
+            onPress={() => openLegal('terms')}
+            accessibilityRole="link"
+            suppressHighlighting
+            className="font-body-semibold text-caption text-primary"
+          >
+            Terms of Use
+          </Text>{' '}
+          and acknowledge our{' '}
+          <Text
+            onPress={() => openLegal('privacy')}
+            accessibilityRole="link"
+            suppressHighlighting
+            className="font-body-semibold text-caption text-primary"
+          >
+            Privacy Policy
+          </Text>
+          .
+        </Text>
       </View>
     </AuthLayout>
   );

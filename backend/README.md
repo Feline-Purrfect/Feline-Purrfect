@@ -8,7 +8,7 @@ and one cron job**. Routes and JSON shapes are unchanged, so the app needs only 
 src/
   server.js            entry (graceful shutdown for Render deploys)
   app.js               middleware, rate limits, route wiring
-  routes/              auth, cats, logs, dashboard, devices, ask, health
+  routes/              auth, cats, logs, dashboard, devices, ask, legal, health
   services/            storage (photos), analytics, push, claude + askContext (Ask)
   jobs/checkMissingLogs.js   daily reminder (Render Cron Job)
 supabase/schema.sql    tables, indexes, RLS, storage bucket
@@ -62,6 +62,20 @@ The Ask tab answers questions with Claude Haiku 5.5 through the Claude API (plai
 - **Cost control:** `ASK_DAILY_LIMIT` questions per user per 24 h (default 30), a burst limit of 12/min, and low effort. A cat question is roughly 3–6k input tokens.
 - **Reports:** every answer can be flagged in the app (Google Play requirement). Review them with
   `select * from ask_messages where reported_at is not null order by reported_at desc;`
+
+## Terms of Use and Privacy Policy
+
+Served as public web pages, before rate limiting:
+
+- `https://<your-api>/legal/terms`
+- `https://<your-api>/legal/privacy`
+
+The app opens them from Sign up, Settings and the Ask consent screen. Use the same URLs in
+App Store Connect (Privacy Policy URL, and License Agreement if you use a custom EULA) and in the
+Google Play Console. The text lives in `legal/*.html`; set `LEGAL_OPERATOR_NAME` and
+`LEGAL_CONTACT_EMAIL` so the pages show who runs the app and where privacy requests go.
+When you change what data the app collects or who receives it, update the privacy policy, its
+"Last updated" date, and the stores' privacy forms (App Privacy / Data safety) together.
 
 ## 3. Deploy on Render
 
