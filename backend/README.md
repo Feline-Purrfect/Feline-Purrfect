@@ -8,11 +8,10 @@ and one cron job**. Routes and JSON shapes are unchanged, so the app needs only 
 src/
   server.js            entry (graceful shutdown for Render deploys)
   app.js               middleware, rate limits, route wiring
-  routes/              auth, cats, logs, diseases, dashboard, devices, health
+  routes/              auth, cats, logs, dashboard, devices, health
   services/            storage (photos), analytics, push
   jobs/checkMissingLogs.js   daily reminder (Render Cron Job)
 supabase/schema.sql    tables, indexes, RLS, storage bucket
-scripts/seed-diseases.js
 test/                  npm test — route logic against an in-memory fake (no network needed)
 ```
 
@@ -48,7 +47,6 @@ test/                  npm test — route logic against an in-memory fake (no ne
 ```bash
 cp .env.example .env        # fill in the three Supabase values
 npm install                 # generates package-lock.json: commit it
-npm run seed:diseases       # loads your 20 diseases; safe to re-run
 npm test                    # 25 tests, no network needed
 npm run dev                 # http://localhost:3000/health/ready
 ```
@@ -95,7 +93,7 @@ Supabase reports a wrong code and an expired code identically, so both surface a
 - **Cognito users can't be imported with their passwords.** If real users exist, they'll need to sign up again or use "forgot password".
 - **Photo URLs no longer go stale.** The old Lambdas stored a 7-day presigned URL in the database, so
   photos broke after a week. Now only the storage path is stored and a fresh URL is signed on every read.
-- **The seed endpoint is gone.** `POST /diseases/seed` was unauthenticated; seeding is now a CLI script.
+- **The disease library is gone.** The Search tab, `/diseases` routes and the seed script were removed (replaced by Ask). Existing databases: run `supabase/migrations/004_drop_diseases.sql`.
 - **Photos are validated** (≤ 5 MB; JPEG/PNG/WebP by file signature).
 - **500 responses no longer include the raw error message.**
 - `forgot-password` always answers success, so it can't be used to discover which emails have accounts.

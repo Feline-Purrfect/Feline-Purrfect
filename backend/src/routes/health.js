@@ -14,8 +14,8 @@ router.get('/health/ready', async (req, res) => {
   const started = Date.now();
   try {
     const { error } = await admin
-      .from('diseases')
-      .select('disease_id')
+      .from('cats')
+      .select('cat_id')
       .limit(1);
     if (error) throw error;
     res.json({ status: 'ok', database: 'up', latencyMs: Date.now() - started });

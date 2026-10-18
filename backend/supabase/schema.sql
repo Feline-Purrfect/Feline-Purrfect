@@ -95,22 +95,6 @@ drop trigger if exists logs_set_updated_at on public.logs;
 create trigger logs_set_updated_at before update on public.logs
   for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------- diseases
-create table if not exists public.diseases (
-  disease_id   uuid primary key default gen_random_uuid(),
-  name         text not null unique,        -- unique so re-running the seed never duplicates
-  category     text not null,
-  symptoms     text[] not null default '{}',
-  description  text not null default '',
-  prevention   text[] not null default '{}',
-  severity     text not null check (severity in ('mild','mild-moderate','moderate','moderate-severe','severe')),
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
-);
-drop trigger if exists diseases_set_updated_at on public.diseases;
-create trigger diseases_set_updated_at before update on public.diseases
-  for each row execute function public.set_updated_at();
-
 -- ---------------------------------------------------------------- device tokens (Expo push)
 create table if not exists public.device_tokens (
   token       text primary key,
@@ -153,7 +137,6 @@ grant execute on function public.cats_missing_log(date) to service_role;
 alter table public.cats          enable row level security;
 alter table public.cat_photos    enable row level security;
 alter table public.logs          enable row level security;
-alter table public.diseases      enable row level security;
 alter table public.device_tokens enable row level security;
 
 -- ---------------------------------------------------------------- storage

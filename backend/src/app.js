@@ -14,7 +14,6 @@ import healthRoutes from './routes/health.js';
 import authRoutes from './routes/auth.js';
 import catsRoutes from './routes/cats.js';
 import logsRoutes from './routes/logs.js';
-import diseasesRoutes from './routes/diseases.js';
 import dashboardRoutes from './routes/dashboard.js';
 import devicesRoutes from './routes/devices.js';
 
@@ -65,7 +64,6 @@ function createApp() {
   app.use('/auth', authLimiter, jsonSmall, authRoutes);
   app.use('/cats', jsonPhoto, catsRoutes);
   app.use('/logs', jsonSmall, logsRoutes);
-  app.use('/diseases', diseasesRoutes);
   app.use('/dashboard', dashboardRoutes);
   app.use('/devices', jsonSmall, devicesRoutes);
 

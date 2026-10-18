@@ -119,10 +119,6 @@ export default Sentry.wrap(function RootLayout() {
             options={{ title: 'Edit Log' }}
           />
           <Stack.Screen
-            name="(screens)/diseases/[id]/index"
-            options={{ title: 'Disease Detail' }}
-          />
-          <Stack.Screen
             name="(screens)/settings/index"
             options={{ title: 'Settings' }}
           />

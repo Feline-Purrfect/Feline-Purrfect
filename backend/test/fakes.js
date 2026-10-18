@@ -1,9 +1,9 @@
 // Shared in-memory state used by both the Supabase stub (test/stubs/supabase.js) and the tests.
 // ------------------------------------------------------------ in-memory database
-const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'], diseases: ['disease_id'] };
+const PK = { logs: ['cat_id', 'log_date'], cats: ['cat_id'], cat_photos: ['photo_id'], device_tokens: ['token'] };
 
 function createDb() {
-  const tables = { cats: [], cat_photos: [], logs: [], diseases: [], device_tokens: [] };
+  const tables = { cats: [], cat_photos: [], logs: [], device_tokens: [] };
 
   class Query {
     constructor(table) { this.table = table; this.op = 'select'; this.filters = []; this.lim = null; this.orders = []; this.rng = null; this.wantCount = false; }

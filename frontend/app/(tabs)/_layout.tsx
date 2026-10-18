@@ -5,7 +5,6 @@ import {
   Entypo as HomeIcon,
   Ionicons as LogsIcon,
   FontAwesome6 as MyCatsIcon,
-  Ionicons as SearchIcon,
 } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
@@ -52,16 +51,6 @@ export default function TabLayout() {
               <LogsIcon name="analytics-sharp" color={color} size={size} />
             ),
             headerShown: false, // the screen draws its own large title and week strip
-          }}
-        />
-        <Tabs.Screen
-          name="search"
-          options={{
-            title: 'Search',
-            tabBarLabel: 'Search',
-            tabBarIcon: ({ color, size }) => (
-              <SearchIcon name="search-sharp" color={color} size={size} />
-            ),
           }}
         />
         <Tabs.Screen
