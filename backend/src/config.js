@@ -15,6 +15,11 @@ const schema = z.object({
   SENTRY_TRACES_SAMPLE_RATE: z.coerce.number().min(0).max(1).default(0.1),
 
   EXPO_ACCESS_TOKEN: z.string().optional(),
+
+  // Ask (AI chat). Without a key the /ask routes answer 503 and the rest of the API works as usual.
+  ANTHROPIC_API_KEY: z.string().optional(),
+  ASK_MODEL: z.string().min(1).default('claude-haiku-5-5'),
+  ASK_DAILY_LIMIT: z.coerce.number().int().positive().default(30),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -44,4 +49,9 @@ export default {
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
   },
   expoAccessToken: env.EXPO_ACCESS_TOKEN || undefined,
+  ask: {
+    apiKey: env.ANTHROPIC_API_KEY || '',
+    model: env.ASK_MODEL,
+    dailyLimit: env.ASK_DAILY_LIMIT,
+  },
 };

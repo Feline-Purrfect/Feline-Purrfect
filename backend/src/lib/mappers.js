@@ -100,19 +100,4 @@ function toLog(row) {
   };
 }
 
-function toDisease(row) {
-  return {
-    id: row.disease_id,
-    diseaseId: row.disease_id,
-    name: row.name,
-    category: row.category,
-    symptoms: row.symptoms ?? [],
-    description: row.description,
-    prevention: row.prevention ?? [],
-    severity: row.severity,
-    createdAt: iso(row.created_at),
-    updatedAt: iso(row.updated_at),
-  };
-}
-
-export { toCat, toPhoto, toLog, toDisease, logId, ageInYears, dateOnly };
+export { toCat, toPhoto, toLog, logId, ageInYears, dateOnly };

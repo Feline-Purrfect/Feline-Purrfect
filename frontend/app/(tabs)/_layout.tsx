@@ -2,10 +2,10 @@ import { AuthGuard } from '@/components/common/AuthGuard';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/theme';
 import {
+  Ionicons as AskIcon,
   Entypo as HomeIcon,
   Ionicons as LogsIcon,
   FontAwesome6 as MyCatsIcon,
-  Ionicons as SearchIcon,
 } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 
@@ -55,13 +55,18 @@ export default function TabLayout() {
           }}
         />
         <Tabs.Screen
-          name="search"
+          name="ask"
           options={{
-            title: 'Search',
-            tabBarLabel: 'Search',
+            title: 'Ask',
+            tabBarLabel: 'Ask',
             tabBarIcon: ({ color, size }) => (
-              <SearchIcon name="search-sharp" color={color} size={size} />
+              <AskIcon
+                name="chatbubble-ellipses-sharp"
+                color={color}
+                size={size}
+              />
             ),
+            headerShown: false, // the screen draws its own large title and chat buttons
           }}
         />
         <Tabs.Screen

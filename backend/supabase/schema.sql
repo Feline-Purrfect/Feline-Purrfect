@@ -95,21 +95,41 @@ drop trigger if exists logs_set_updated_at on public.logs;
 create trigger logs_set_updated_at before update on public.logs
   for each row execute function public.set_updated_at();
 
--- ---------------------------------------------------------------- diseases
-create table if not exists public.diseases (
-  disease_id   uuid primary key default gen_random_uuid(),
-  name         text not null unique,        -- unique so re-running the seed never duplicates
-  category     text not null,
-  symptoms     text[] not null default '{}',
-  description  text not null default '',
-  prevention   text[] not null default '{}',
-  severity     text not null check (severity in ('mild','mild-moderate','moderate','moderate-severe','severe')),
-  created_at   timestamptz not null default now(),
-  updated_at   timestamptz not null default now()
+-- ---------------------------------------------------------------- ask (AI chat)
+-- A thread is one conversation: about one cat (cat_id set) or General (cat_id null).
+-- Deleting a cat deletes its chats; deleting the account deletes everything.
+create table if not exists public.ask_threads (
+  thread_id   uuid primary key default gen_random_uuid(),
+  user_id     uuid not null references auth.users(id) on delete cascade,
+  cat_id      uuid references public.cats(cat_id) on delete cascade,
+  title       text not null default '' check (char_length(title) <= 120),
+  created_at  timestamptz not null default now(),
+  updated_at  timestamptz not null default now()
 );
-drop trigger if exists diseases_set_updated_at on public.diseases;
-create trigger diseases_set_updated_at before update on public.diseases
+create index if not exists ask_threads_user_idx on public.ask_threads (user_id, updated_at desc);
+create index if not exists ask_threads_cat_idx  on public.ask_threads (cat_id, updated_at desc);
+drop trigger if exists ask_threads_set_updated_at on public.ask_threads;
+create trigger ask_threads_set_updated_at before update on public.ask_threads
   for each row execute function public.set_updated_at();
+
+create table if not exists public.ask_messages (
+  message_id     uuid primary key default gen_random_uuid(),
+  thread_id      uuid not null references public.ask_threads(thread_id) on delete cascade,
+  user_id        uuid not null references auth.users(id) on delete cascade,
+  role           text not null check (role in ('user','assistant')),
+  content        text not null check (char_length(content) <= 20000),
+  emergency      boolean not null default false,   -- the hard-coded emergency check matched the question
+  context        jsonb,                            -- { catId, catName, from, to, loggedDays } for cat chats
+  model          text,
+  input_tokens   integer,
+  output_tokens  integer,
+  reported_at    timestamptz,                      -- the owner flagged this answer
+  report_reason  text check (report_reason is null or char_length(report_reason) <= 500),
+  created_at     timestamptz not null default now()
+);
+create index if not exists ask_messages_thread_idx on public.ask_messages (thread_id, created_at);
+create index if not exists ask_messages_quota_idx  on public.ask_messages (user_id, created_at desc) where role = 'user';
+create index if not exists ask_messages_reported_idx on public.ask_messages (reported_at) where reported_at is not null;
 
 -- ---------------------------------------------------------------- device tokens (Expo push)
 create table if not exists public.device_tokens (
@@ -153,8 +173,9 @@ grant execute on function public.cats_missing_log(date) to service_role;
 alter table public.cats          enable row level security;
 alter table public.cat_photos    enable row level security;
 alter table public.logs          enable row level security;
-alter table public.diseases      enable row level security;
 alter table public.device_tokens enable row level security;
+alter table public.ask_threads   enable row level security;
+alter table public.ask_messages  enable row level security;
 
 -- ---------------------------------------------------------------- storage
 insert into storage.buckets (id, name, public)

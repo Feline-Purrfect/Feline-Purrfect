@@ -8,11 +8,10 @@ and one cron job**. Routes and JSON shapes are unchanged, so the app needs only 
 src/
   server.js            entry (graceful shutdown for Render deploys)
   app.js               middleware, rate limits, route wiring
-  routes/              auth, cats, logs, diseases, dashboard, devices, health
-  services/            storage (photos), analytics, push
+  routes/              auth, cats, logs, dashboard, devices, ask, health
+  services/            storage (photos), analytics, push, claude + askContext (Ask)
   jobs/checkMissingLogs.js   daily reminder (Render Cron Job)
 supabase/schema.sql    tables, indexes, RLS, storage bucket
-scripts/seed-diseases.js
 test/                  npm test — route logic against an in-memory fake (no network needed)
 ```
 
@@ -48,10 +47,21 @@ test/                  npm test — route logic against an in-memory fake (no ne
 ```bash
 cp .env.example .env        # fill in the three Supabase values
 npm install                 # generates package-lock.json: commit it
-npm run seed:diseases       # loads your 20 diseases; safe to re-run
-npm test                    # 25 tests, no network needed
+npm test                    # route tests, no network needed
 npm run dev                 # http://localhost:3000/health/ready
 ```
+
+## Ask (AI chat)
+
+The Ask tab answers questions with Claude Haiku 5.5 through the Claude API (plain `fetch`, no SDK).
+
+- **Setup:** set `ANTHROPIC_API_KEY` (server only). Without it the rest of the API works and Ask reports itself unavailable. Existing databases: run `supabase/migrations/005_ask.sql`.
+- **Two kinds of chat:** General (no personal data sent) and one per cat. A cat question carries the cat's profile, its last 30 days of logs as one compact line per day, and summaries computed in code (averages, last 7 days vs before, symptom counts, weight change). For older days the model calls the `get_logs` tool (max 92 days per call, always for the chat's own cat).
+- **Consent:** nothing is sent until the user allows it (App Store guideline 5.1.2(i)); stored as `ai_consent_at` in the user's metadata and enforced by the API.
+- **Safety:** a hard-coded check flags emergency wording (urinary blockage, lilies, human painkillers, breathing trouble…) so the app shows an emergency card regardless of the answer; the system prompt carries the remaining rules.
+- **Cost control:** `ASK_DAILY_LIMIT` questions per user per 24 h (default 30), a burst limit of 12/min, and low effort. A cat question is roughly 3–6k input tokens.
+- **Reports:** every answer can be flagged in the app (Google Play requirement). Review them with
+  `select * from ask_messages where reported_at is not null order by reported_at desc;`
 
 ## 3. Deploy on Render
 
@@ -95,7 +105,7 @@ Supabase reports a wrong code and an expired code identically, so both surface a
 - **Cognito users can't be imported with their passwords.** If real users exist, they'll need to sign up again or use "forgot password".
 - **Photo URLs no longer go stale.** The old Lambdas stored a 7-day presigned URL in the database, so
   photos broke after a week. Now only the storage path is stored and a fresh URL is signed on every read.
-- **The seed endpoint is gone.** `POST /diseases/seed` was unauthenticated; seeding is now a CLI script.
+- **The disease library is gone.** The Search tab, `/diseases` routes and the seed script were removed (replaced by Ask). Existing databases: run `supabase/migrations/004_drop_diseases.sql`.
 - **Photos are validated** (≤ 5 MB; JPEG/PNG/WebP by file signature).
 - **500 responses no longer include the raw error message.**
 - `forgot-password` always answers success, so it can't be used to discover which emails have accounts.

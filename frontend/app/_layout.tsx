@@ -81,6 +81,10 @@ export default Sentry.wrap(function RootLayout() {
           />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen
+            name="(screens)/ask/history"
+            options={{ title: 'Chat history' }}
+          />
+          <Stack.Screen
             name="(screens)/dashboard/analytics"
             options={{ title: 'Detailed Analytics' }}
           />
@@ -117,10 +121,6 @@ export default Sentry.wrap(function RootLayout() {
           <Stack.Screen
             name="(screens)/logs/[id]/edit"
             options={{ title: 'Edit Log' }}
-          />
-          <Stack.Screen
-            name="(screens)/diseases/[id]/index"
-            options={{ title: 'Disease Detail' }}
           />
           <Stack.Screen
             name="(screens)/settings/index"
