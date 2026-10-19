@@ -8,23 +8,23 @@ and one cron job**. Routes and JSON shapes are unchanged, so the app needs only 
 src/
   server.js            entry (graceful shutdown for Render deploys)
   app.js               middleware, rate limits, route wiring
-  routes/              auth, cats, logs, dashboard, devices, ask, legal, health
-  services/            storage (photos), analytics, push, claude + askContext (Ask)
-  jobs/checkMissingLogs.js   daily reminder (Render Cron Job)
+  routes/              auth, cats, logs, dashboard, devices, notifications, ask, legal, health
+  services/            storage (photos), analytics, push, reminders, claude + askContext (Ask)
+  jobs/checkMissingLogs.js   daily log reminder (Render Cron Job, every 5 min)
 supabase/schema.sql    tables, indexes, RLS, storage bucket
 test/                  npm test — route logic against an in-memory fake (no network needed)
 ```
 
-| Old (AWS)                        | New                                         |
-|----------------------------------|---------------------------------------------|
-| Cognito                          | Supabase Auth (same endpoints + error codes)|
-| DynamoDB (cats/logs/diseases)    | Supabase Postgres                           |
-| S3 + presigned URLs              | Supabase Storage (private bucket, signed URLs) |
-| API Gateway + Lambdas            | Express web service on Render               |
-| EventBridge + check-missing-logs | Render Cron Job                             |
-| SNS reminders                    | Expo push notifications                     |
+| Old (AWS)                        | New                                              |
+| -------------------------------- | ------------------------------------------------ |
+| Cognito                          | Supabase Auth (same endpoints + error codes)     |
+| DynamoDB (cats/logs/diseases)    | Supabase Postgres                                |
+| S3 + presigned URLs              | Supabase Storage (private bucket, signed URLs)   |
+| API Gateway + Lambdas            | Express web service on Render                    |
+| EventBridge + check-missing-logs | Render Cron Job                                  |
+| SNS reminders                    | Expo push notifications                          |
 | CloudWatch / WAF                 | Sentry + uptime monitor + rate limiting + helmet |
-| SageMaker / breed-detection      | removed                                     |
+| SageMaker / breed-detection      | removed                                          |
 
 ## 1. Supabase setup (≈15 min)
 
@@ -35,8 +35,8 @@ test/                  npm test — route logic against an in-memory fake (no ne
 4. **Authentication → Providers → Email**: keep "Confirm email" ON. Under password requirements,
    set min length 8 and require lower, upper, digit and symbol (the API enforces this too).
 5. **Authentication → Email Templates** — the app uses 6-digit codes (like Cognito), not links, so edit two templates:
-   - *Confirm signup*: `<h2>Verify your email</h2><p>Your code: <strong>{{ .Token }}</strong></p>`
-   - *Reset password*: `<h2>Reset your password</h2><p>Your code: <strong>{{ .Token }}</strong></p>`
+   - _Confirm signup_: `<h2>Verify your email</h2><p>Your code: <strong>{{ .Token }}</strong></p>`
+   - _Reset password_: `<h2>Reset your password</h2><p>Your code: <strong>{{ .Token }}</strong></p>`
 6. **Authentication → SMTP Settings**: configure a real SMTP provider (Resend, Postmark, SES…).
    Supabase's built-in mailer is limited to a handful of emails per hour. Fine for a test, not for launch.
 7. **Authentication → Sessions / JWT**: access tokens last 1 hour by default (Cognito's were 60 min too).
@@ -63,6 +63,26 @@ The Ask tab answers questions with Claude Haiku 5.5 through the Claude API (plai
 - **Reports:** every answer can be flagged in the app (Google Play requirement). Review them with
   `select * from ask_messages where reported_at is not null order by reported_at desc;`
 
+## Daily log reminder
+
+A push notification nudges the user when a cat's log for the day isn't finished (food and water filled in).
+
+- **When:** once a day at the time the user picks in Settings → Notifications (default **23:00**), in their
+  phone's time zone. The app sends the time zone with every device registration, so it follows them when they travel.
+- **Only if needed:** checked at send time against the server's data, so a cat logged on another phone counts.
+  No push when every active cat is logged; archived cats are ignored. Each day's reminder goes out at most once
+  (`notification_settings.last_reminded_on`), and moving the time to one that has already passed today starts tomorrow.
+- **How:** the Render Cron Job runs every 5 minutes, so a reminder arrives within ~5 minutes of the chosen time
+  (up to 60 minutes late if runs were missed, never early, never twice). Delivery is through the Expo Push Service.
+- **API:** `GET /notifications/settings` → `{ dailyReminder, remindAt: "23:00", timezone }`;
+  `PUT /notifications/settings` with any of those fields. `POST /devices { token, platform, timezone }` creates
+  the settings on first registration.
+- **Setup (existing databases):** run `supabase/migrations/006_notification_settings.sql`.
+- **Run it by hand:** `npm run job:check-missing-logs:local` (sends to anyone whose time falls in the last hour).
+- **Test button:** user ids listed in `NOTIFICATION_TESTER_IDS` (web service env) see "Send test notification"
+  in Settings → Notifications. It calls `POST /notifications/test`, which pushes to that user's own phones
+  immediately and records nothing, so tonight's real reminder still goes out. Everyone else gets 403.
+
 ## Terms of Use and Privacy Policy
 
 Served as public web pages, before rate limiting:
@@ -77,12 +97,36 @@ Google Play Console. The text lives in `legal/*.html`; set `LEGAL_OPERATOR_NAME`
 When you change what data the app collects or who receives it, update the privacy policy, its
 "Last updated" date, and the stores' privacy forms (App Privacy / Data safety) together.
 
+# <<<<<<< HEAD
+
+> > > > > > > Stashed changes
+
+> > > > > > > 2c24e909332f67d191d4d6653066c98e3224de94
+
 ## 3. Deploy on Render
 
-1. Push this folder to its own GitHub repo.
-2. Render → **New → Blueprint** → select the repo. It creates the web service and the cron job from `render.yaml`.
-3. Fill the `sync: false` secrets when prompted (Supabase keys, `SENTRY_DSN`, optional `EXPO_ACCESS_TOKEN`).
-4. Your API is at `https://feline-purrfect-api.onrender.com`. Verify `/health/ready` returns `{"status":"ok"}`.
+The Blueprint is `render.yaml` at the **repo root** (Render only reads it there). Both services build from
+`backend/` (`rootDir`).
+
+1. Render → **New → Blueprint** → select this repo, branch `main`. It creates (or adopts, by name) the web
+   service and the cron job from `render.yaml`.
+2. Fill the `sync: false` secrets when prompted (Supabase keys, `SENTRY_DSN`, optional `EXPO_ACCESS_TOKEN`,
+   `NOTIFICATION_TESTER_IDS`).
+3. Your API is at `https://feline-purrfect-api.onrender.com`. Verify `/health/ready` returns `{"status":"ok"}`.
+
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every pull request into `main` and on every commit to `main`:
+
+| Job      | Steps                                                                                 |
+| -------- | ------------------------------------------------------------------------------------- |
+| Backend  | `npm ci`, syntax check, `npm test` (offline, no secrets needed)                       |
+| Frontend | `npm ci`, `tsc --noEmit`, `expo lint`, and an iOS + Android bundle with `expo export` |
+
+Render deploys with `autoDeployTrigger: checksPass`: a commit on `main` that touches `backend/` is deployed once
+its GitHub checks pass, and never when they fail. Frontend-only commits, tests and docs don't redeploy.
+Database migrations (`supabase/migrations/`) are still run by hand in the Supabase SQL editor, before merging
+code that needs them.
 
 > **App Store note:** Render's free web instances sleep after ~15 minutes idle and take 30–60 s to wake.
 > App Review will open your app cold, so a sleeping backend means a login timeout and a likely rejection.
@@ -92,8 +136,8 @@ When you change what data the app collects or who receives it, update the privac
 
 - **Errors / performance:** create a Sentry project (Node), put its DSN in `SENTRY_DSN`. Unhandled errors and
   slow requests are captured automatically; `Authorization` headers are never logged.
-- **Cron monitor:** with the DSN set, the daily job registers a Sentry Cron Monitor and alerts you if it
-  fails *or doesn't run at all*.
+- **Cron monitor:** with the DSN set, the reminder job registers a Sentry Cron Monitor and alerts you if it
+  fails _or doesn't run at all_.
 - **Uptime:** add a free monitor (UptimeRobot or Better Stack) on `GET /health/ready` every 1–5 min.
   `/health` (Render's check) never touches the DB; `/health/ready` does, so it catches a Supabase outage.
 - **Logs:** structured JSON on stdout → Render Logs; use a Log Stream if you want them in Better Stack / Datadog.
@@ -107,8 +151,8 @@ When you change what data the app collects or who receives it, update the privac
 3. **Token refresh (recommended):** the app stores `refreshToken` but never uses it, so users are signed out
    after an hour. `POST /auth/refresh {refreshToken}` returns the same shape as login; call it on a 401,
    store the new tokens, retry once.
-4. **Push reminders (optional):** add `expo-notifications`, get the Expo push token after sign-in, and send
-   `POST /devices {token, platform}` (and `DELETE /devices {token}` on sign-out). Until then the cron job simply has nobody to notify.
+4. **Push reminders:** done. The app registers its Expo push token (`POST /devices`) after sign-in and removes it
+   on sign-out; see "Daily log reminder" above.
 
 Auth error codes (`UsernameExistsException`, `CodeMismatchException`, `NotAuthorizedException`, …) are
 translated to the Cognito names your screens already check, so no auth UI changes are needed.

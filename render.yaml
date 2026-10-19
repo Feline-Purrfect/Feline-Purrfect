@@ -1,15 +1,27 @@
-# Render Blueprint — New → Blueprint → connect this repo.
+# Render Blueprint — New → Blueprint → connect this repo. Render only reads render.yaml at the repo root.
 # Replaces: API Gateway + 8 Lambdas (web service) and EventBridge + check-missing-logs (cron job).
+#
+# Deploys: every commit on main whose GitHub checks pass (.github/workflows/ci.yml) and that touches
+# backend/ redeploys both services. Frontend-only commits don't redeploy anything.
 services:
   - type: web
     name: feline-purrfect-api
     runtime: node
     region: virginia            # closest to your old us-east-1; keep Supabase in us-east-1 too
     plan: starter               # free instances sleep after 15 min idle — see README before using free for the App Store
-    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    branch: main
+    rootDir: backend            # the Node app lives in backend/; commands run there
+    buildFilter:                # paths are relative to the repo root
+      paths:
+        - backend/**
+      ignoredPaths:
+        - backend/test/**
+        - backend/**/*.md
+        - backend/.env.example
+    autoDeployTrigger: checksPass  # deploy only after CI passes on the commit
+    buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
-    autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: "22"
@@ -29,6 +41,8 @@ services:
         value: "0.1"
       - key: CORS_ORIGINS
         value: ""
+      - key: NOTIFICATION_TESTER_IDS
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: ASK_MODEL
@@ -45,8 +59,18 @@ services:
     runtime: node
     region: virginia
     plan: starter
-    schedule: "30 23 * * *"     # 23:30 UTC daily — identical to the old EventBridge rule
-    buildCommand: npm install --omit=dev   # switch to `npm ci --omit=dev` once package-lock.json is committed
+    schedule: "*/5 * * * *"     # every 5 min: each user's reminder goes out at their own time (default 23:00 local), once a day
+    branch: main
+    rootDir: backend            # the Node app lives in backend/; commands run there
+    buildFilter:                # paths are relative to the repo root
+      paths:
+        - backend/**
+      ignoredPaths:
+        - backend/test/**
+        - backend/**/*.md
+        - backend/.env.example
+    autoDeployTrigger: checksPass  # deploy only after CI passes on the commit
+    buildCommand: npm ci --omit=dev
     startCommand: npm run job:check-missing-logs
     envVars:
       - key: NODE_VERSION
