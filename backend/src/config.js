@@ -20,6 +20,10 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   ASK_MODEL: z.string().min(1).default('claude-haiku-5-5'),
   ASK_DAILY_LIMIT: z.coerce.number().int().positive().default(30),
+
+  // Shown in the Terms of Use and Privacy Policy (/legal/terms, /legal/privacy).
+  LEGAL_OPERATOR_NAME: z.string().min(1).default('Feline Purrfect'),
+  LEGAL_CONTACT_EMAIL: z.string().email().optional(),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -53,5 +57,9 @@ export default {
     apiKey: env.ANTHROPIC_API_KEY || '',
     model: env.ASK_MODEL,
     dailyLimit: env.ASK_DAILY_LIMIT,
+  },
+  legal: {
+    operator: env.LEGAL_OPERATOR_NAME,
+    contactEmail: env.LEGAL_CONTACT_EMAIL || '',
   },
 };

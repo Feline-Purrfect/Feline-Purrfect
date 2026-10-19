@@ -1,5 +1,6 @@
 import { Button, Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
+import { openLegal } from '@/lib/legal';
 import Feather from '@expo/vector-icons/Feather';
 import { ComponentProps } from 'react';
 import { Modal, Pressable, ScrollView, View } from 'react-native';
@@ -82,6 +83,16 @@ export function ConsentSheet({
             Ask can be wrong and isn’t a vet. For anything worrying, call your
             vet.
           </Point>
+          <Pressable
+            onPress={() => openLegal('privacy')}
+            accessibilityRole="link"
+            hitSlop={8}
+            className="self-start py-1"
+          >
+            <Text className="font-body-semibold text-label text-primary">
+              Read the Privacy Policy
+            </Text>
+          </Pressable>
           <View className="gap-2 mt-1">
             <Button
               title="Allow and continue"

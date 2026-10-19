@@ -97,7 +97,11 @@ Google Play Console. The text lives in `legal/*.html`; set `LEGAL_OPERATOR_NAME`
 When you change what data the app collects or who receives it, update the privacy policy, its
 "Last updated" date, and the stores' privacy forms (App Privacy / Data safety) together.
 
+# <<<<<<< HEAD
+
 > > > > > > > Stashed changes
+
+> > > > > > > 2c24e909332f67d191d4d6653066c98e3224de94
 
 ## 3. Deploy on Render
 

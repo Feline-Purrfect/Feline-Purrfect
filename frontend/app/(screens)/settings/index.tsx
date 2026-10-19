@@ -8,6 +8,7 @@ import { UserAvatar } from '@/components/settings/UserAvatar';
 import { Colors } from '@/constants/colors';
 import { useAskConsent, useAskStatus } from '@/hooks/useAsk';
 import { useAuth, useSignOut } from '@/hooks/useAuth';
+import { openLegal } from '@/lib/legal';
 import Feather from '@expo/vector-icons/Feather';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
@@ -16,7 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
-// Notifications and the privacy policy get their own screens later.
+// Notification settings get their own screen later.
 const comingSoon = (what: string) =>
   Alert.alert('Coming soon', `${what} will be available soon.`);
 
@@ -125,10 +126,17 @@ export default function SettingsScreen() {
 
         <SettingsSection title="About">
           <SettingsRow
+            icon="file-text"
+            label="Terms of use"
+            external
+            onPress={() => openLegal('terms')}
+          />
+          <Divider className="ml-[50px]" />
+          <SettingsRow
             icon="shield"
             label="Privacy policy"
             external
-            onPress={() => comingSoon('The privacy policy')}
+            onPress={() => openLegal('privacy')}
           />
         </SettingsSection>
 
