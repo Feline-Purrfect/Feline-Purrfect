@@ -12,7 +12,7 @@ import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   return (
-    <AuthGuard>
+    <AuthGuard allowGuest>
       <Reminders />
       <Tabs
         screenOptions={{
@@ -87,7 +87,7 @@ export default function TabLayout() {
   );
 }
 
-/** Signed-in only (inside AuthGuard): push registration, the one-time offer, and reminder taps. */
+/** Push registration, the one-time offer (signed-in only, see useReminderSetup), and reminder taps. */
 function Reminders() {
   useReminderSetup();
   useReminderTapHandler();

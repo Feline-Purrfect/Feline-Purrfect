@@ -70,7 +70,7 @@ export default Sentry.wrap(function RootLayout() {
         >
           {/* Sign-in screens draw their own centered title; the native header only carries the back
               button. Log in is the root, so it has none. */}
-          <Stack.Screen name="(auth)/login" options={{ headerShown: false }} />
+          <Stack.Screen name="(auth)/login" options={{ title: '' }} />
           <Stack.Screen name="(auth)/signup" options={{ title: '' }} />
           <Stack.Screen name="(auth)/verify-email" options={{ title: '' }} />
           <Stack.Screen name="(auth)/forgot-password" options={{ title: '' }} />

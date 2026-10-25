@@ -1,6 +1,7 @@
 import { ErrorView } from '@/components/common/ErrorView';
 import { Button, Text } from '@/components/ds';
 import { CalendarSheet } from '@/components/logs/CalendarSheet';
+import { GuestBanner } from '@/components/guest/GuestBanner';
 import { CompactLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
 import { LogCardsSkeleton } from '@/components/logs/LogSkeletons';
 import { WeekStrip } from '@/components/logs/WeekStrip';
@@ -131,6 +132,7 @@ export default function LogsScreen() {
           />
         }
       >
+        <GuestBanner />
         <Text variant="label" className="text-ink-muted">
           {isToday
             ? `Today · ${LONG.format(fromYmd(selected))}`

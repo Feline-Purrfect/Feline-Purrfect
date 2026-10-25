@@ -10,6 +10,7 @@ import { formatAmount, logTime, medicationLabel, symptomLabel } from '@/lib/logs
 import { CatResponse } from '@/types/cat';
 import { LogResponse } from '@/types/log';
 import Feather from '@expo/vector-icons/Feather';
+import { requireAccount } from '@/lib/guest';
 import { router } from 'expo-router';
 import { ReactNode, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -157,8 +158,11 @@ export function FullLogCard({ cat, log }: { cat: CatResponse; log: LogResponse }
 /** Not finished yet (or not started): dashed card, any symptom already noted, and one clear action. */
 export function PendingLogCard({ cat, log, date, isToday }: { cat: CatResponse; log: LogResponse | null; date: string; isToday: boolean }) {
   const [first, ...rest] = log?.symptoms ?? [];
-  const go = () =>
-    log ? router.push(`/logs/${log.id}/edit`) : router.push({ pathname: '/logs/[id]/create', params: { id: cat.catId, date } });
+  const go = () => {
+    if (!requireAccount('log your cat’s day')) return;
+    if (log) router.push(`/logs/${log.id}/edit`);
+    else router.push({ pathname: '/logs/[id]/create', params: { id: cat.catId, date } });
+  };
   const cta = log ? (isToday ? 'Finish today’s log' : 'Finish this log') : isToday ? 'Log today' : 'Add a log for this day';
 
   return (

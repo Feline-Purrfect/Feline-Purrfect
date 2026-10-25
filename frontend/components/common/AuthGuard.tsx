@@ -5,9 +5,11 @@ import { ReactNode } from 'react';
 
 interface AuthGuardProps {
   children: ReactNode;
+  /** Let guests in too (they see sample data). Without it, guests are sent to log in. */
+  allowGuest?: boolean;
 }
 
-export function AuthGuard({ children }: AuthGuardProps) {
+export function AuthGuard({ children, allowGuest = false }: AuthGuardProps) {
   const { user, isAuthenticated } = useAuth();
 
   // Show loading while checking auth status
@@ -15,11 +17,9 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return <LoadingIndicator />;
   }
 
-  // Redirect to login if not authenticated
-  if (!isAuthenticated) {
+  if (!isAuthenticated && !allowGuest) {
     return <Redirect href="/login" />;
   }
 
-  // User is authenticated, render children
   return <>{children}</>;
 }
