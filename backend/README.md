@@ -97,12 +97,36 @@ Google Play Console. The text lives in `legal/*.html`; set `LEGAL_OPERATOR_NAME`
 When you change what data the app collects or who receives it, update the privacy policy, its
 "Last updated" date, and the stores' privacy forms (App Privacy / Data safety) together.
 
+# <<<<<<< HEAD
+
+> > > > > > > Stashed changes
+
+> > > > > > > 2c24e909332f67d191d4d6653066c98e3224de94
+
 ## 3. Deploy on Render
 
-1. Push this folder to its own GitHub repo.
-2. Render → **New → Blueprint** → select the repo. It creates the web service and the cron job from `render.yaml`.
-3. Fill the `sync: false` secrets when prompted (Supabase keys, `SENTRY_DSN`, optional `EXPO_ACCESS_TOKEN`).
-4. Your API is at `https://feline-purrfect-api.onrender.com`. Verify `/health/ready` returns `{"status":"ok"}`.
+The Blueprint is `render.yaml` at the **repo root** (Render only reads it there). Both services build from
+`backend/` (`rootDir`).
+
+1. Render → **New → Blueprint** → select this repo, branch `main`. It creates (or adopts, by name) the web
+   service and the cron job from `render.yaml`.
+2. Fill the `sync: false` secrets when prompted (Supabase keys, `SENTRY_DSN`, optional `EXPO_ACCESS_TOKEN`,
+   `NOTIFICATION_TESTER_IDS`).
+3. Your API is at `https://feline-purrfect-api.onrender.com`. Verify `/health/ready` returns `{"status":"ok"}`.
+
+## CI/CD
+
+`.github/workflows/ci.yml` runs on every pull request into `main` and on every commit to `main`:
+
+| Job      | Steps                                                                                 |
+| -------- | ------------------------------------------------------------------------------------- |
+| Backend  | `npm ci`, syntax check, `npm test` (offline, no secrets needed)                       |
+| Frontend | `npm ci`, `tsc --noEmit`, `expo lint`, and an iOS + Android bundle with `expo export` |
+
+Render deploys with `autoDeployTrigger: checksPass`: a commit on `main` that touches `backend/` is deployed once
+its GitHub checks pass, and never when they fail. Frontend-only commits, tests and docs don't redeploy.
+Database migrations (`supabase/migrations/`) are still run by hand in the Supabase SQL editor, before merging
+code that needs them.
 
 > **App Store note:** Render's free web instances sleep after ~15 minutes idle and take 30–60 s to wake.
 > App Review will open your app cold, so a sleeping backend means a login timeout and a likely rejection.
