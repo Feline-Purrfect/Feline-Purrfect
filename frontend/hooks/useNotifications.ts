@@ -1,4 +1,5 @@
 import { notificationsApi } from '@/api/notifications';
+import { useAuth } from '@/hooks/useAuth';
 import { useCats } from '@/hooks/useCats';
 import {
   PushPermission,
@@ -146,8 +147,10 @@ export function useEnableReminders() {
  */
 export function useReminderSetup() {
   const queryClient = useQueryClient();
+  // Guests see sample cats: no push token to register and no reminder to offer.
+  const { isAuthenticated } = useAuth();
   const { data: cats } = useCats();
-  const hasCats = (cats?.length ?? 0) > 0;
+  const hasCats = isAuthenticated && (cats?.length ?? 0) > 0;
   const last = useRef<{
     at: number;
     tz: string;
@@ -159,7 +162,8 @@ export function useReminderSetup() {
   });
 
   useEffect(() => {
-    if (!pushSupported) return;
+    if (!pushSupported || !isAuthenticated) return;
+    last.current = { at: 0, tz: '', permission: null }; // a new sign-in always re-registers
     const sync = async () => {
       try {
         const permission = await getPushPermission();
@@ -185,7 +189,7 @@ export function useReminderSetup() {
       if (s === 'active') sync();
     });
     return () => sub.remove();
-  }, [queryClient]);
+  }, [queryClient, isAuthenticated]);
 
   useEffect(() => {
     if (!pushSupported || !hasCats) return;

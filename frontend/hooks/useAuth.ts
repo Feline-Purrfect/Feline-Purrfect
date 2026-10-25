@@ -8,8 +8,10 @@ import { Alert } from 'react-native';
 
 /** Drop every cached query that belongs to the previous user, keeping the auth query itself. */
 function resetUserData(queryClient: QueryClient, user: AuthUser | null) {
-  queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== AUTH_QUERY_KEY[0] });
   queryClient.setQueryData(AUTH_QUERY_KEY, user);
+  // Reset (not just remove) everything else: screens still mounted underneath (e.g. Home showing sample
+  // cats when the guest opened Log in) drop the old data and refetch as the new user right away.
+  queryClient.resetQueries({ predicate: (q) => q.queryKey[0] !== AUTH_QUERY_KEY[0] });
 }
 
 // Get current user

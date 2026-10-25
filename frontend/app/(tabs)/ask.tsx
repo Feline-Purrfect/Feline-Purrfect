@@ -24,6 +24,7 @@ import { AskSubject } from '@/types/ask';
 import { CatResponse } from '@/types/cat';
 import Feather from '@expo/vector-icons/Feather';
 import { useQueryClient } from '@tanstack/react-query';
+import { requireAccount } from '@/lib/guest';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ComponentProps, useRef, useState } from 'react';
 import {
@@ -228,6 +229,8 @@ export default function AskScreen() {
   const submit = (text: string = draft) => {
     const q = text.trim();
     if (!q || send.isPending) return;
+    // Ask calls a paid AI service with a daily quota per account, so it needs an account.
+    if (!requireAccount('ask questions')) return;
     if (status.data && !status.data.consented) {
       setQueued(q);
       setConsentOpen(true);

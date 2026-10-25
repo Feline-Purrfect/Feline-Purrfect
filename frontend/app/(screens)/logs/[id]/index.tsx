@@ -5,6 +5,7 @@ import { LogDetailSkeleton } from '@/components/logs/LogSkeletons';
 import { useCat } from '@/hooks/useCats';
 import { useLog } from '@/hooks/useLogs';
 import { formatLongDate, todayYmd } from '@/lib/dates';
+import { requireAccount } from '@/lib/guest';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,7 +31,7 @@ export default function LogDetailScreen() {
             <Text variant="title" accessibilityRole="header">{cat.name}</Text>
             <Text variant="body" className="text-ink-muted">{formatLongDate(log.date)}</Text>
           </View>
-          <Button variant="pillOutline" title="Edit" onPress={() => router.push(`/logs/${log.id}/edit`)} />
+          <Button variant="pillOutline" title="Edit" onPress={() => requireAccount('edit a log') && router.push(`/logs/${log.id}/edit`)} />
         </View>
       </View>
       {log.complete ? (

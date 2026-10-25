@@ -1,5 +1,6 @@
 import { ErrorView } from '@/components/common/ErrorView';
 import { Button, Text } from '@/components/ds';
+import { GuestBanner, GuestLoginButton } from '@/components/guest/GuestBanner';
 import { FoodTrendCard } from '@/components/home/FoodTrendCard';
 import {
   FoodTrendCardSkeleton,
@@ -8,6 +9,7 @@ import {
 } from '@/components/home/HomeSkeleton';
 import { LogStatus } from '@/components/home/LogStatus';
 import { Colors } from '@/constants/colors';
+import { useAuth } from '@/hooks/useAuth';
 import { catKeys, useCats } from '@/hooks/useCats';
 import { useDashboardAnalytics } from '@/hooks/useDashboard';
 import { logKeys, useLogsRange } from '@/hooks/useLogs';
@@ -35,6 +37,7 @@ const DOTS_MAX = 5; // more cats than this → "2 / 10" instead of dots
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const { isAuthenticated } = useAuth();
   const { width: screenW } = useWindowDimensions();
   const [today, setToday] = useState(todayYmd);
   const [page, setPage] = useState(0);
@@ -126,15 +129,21 @@ export default function HomeScreen() {
         <Text variant="title" accessibilityRole="header">
           Home
         </Text>
-        <Pressable
-          onPress={() => router.push('/settings')}
-          accessibilityRole="button"
-          accessibilityLabel="Settings"
-          className="w-11 h-11 rounded-full border border-line bg-surface items-center justify-center active:bg-fill"
-        >
-          <Feather name="settings" size={20} color={Colors.ink.DEFAULT} />
-        </Pressable>
+        {isAuthenticated ? (
+          <Pressable
+            onPress={() => router.push('/settings')}
+            accessibilityRole="button"
+            accessibilityLabel="Settings"
+            className="w-11 h-11 rounded-full border border-line bg-surface items-center justify-center active:bg-fill"
+          >
+            <Feather name="settings" size={20} color={Colors.ink.DEFAULT} />
+          </Pressable>
+        ) : (
+          <GuestLoginButton />
+        )}
       </View>
+
+      <GuestBanner className="mx-5 -mt-2" />
 
       {cats.isLoading ? (
         <HomeSkeleton screenWidth={screenW} />

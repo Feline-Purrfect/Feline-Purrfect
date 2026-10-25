@@ -8,6 +8,8 @@ import { formatRelativeDay } from '@/lib/dates';
 import { CatResponse } from '@/types/cat';
 import Feather from '@expo/vector-icons/Feather';
 import { Image } from 'expo-image';
+import { GuestBanner } from '@/components/guest/GuestBanner';
+import { requireAccount } from '@/lib/guest';
 import { router } from 'expo-router';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -21,6 +23,7 @@ function pairs<T>(items: T[]): [T, T | undefined][] {
 
 export default function MyCatsScreen() {
   const insets = useSafeAreaInsets();
+  const addCat = () => requireAccount('add a cat') && router.push('/my-cats/create');
   const cats = useCats();
   const archived = useArchivedCats();
   const recent = useRecentPhotos(3);
@@ -49,10 +52,12 @@ export default function MyCatsScreen() {
             variant="pill"
             title="Add cat"
             icon={<Feather name="plus" size={16} color="#FFFFFF" />}
-            onPress={() => router.push('/my-cats/create')}
+            onPress={addCat}
           />
         )}
       </View>
+
+      <GuestBanner className="-mt-2" />
 
       {cats.isLoading ? (
         <CatGridSkeleton />
@@ -62,7 +67,7 @@ export default function MyCatsScreen() {
           <Text variant="caption" className="text-center text-body">
             A profile holds their birthday, weight and photos, and gives daily logs somewhere to live.
           </Text>
-          <Button title="Add cat" onPress={() => router.push('/my-cats/create')} className="self-stretch mt-2" />
+          <Button title="Add cat" onPress={addCat} className="self-stretch mt-2" />
         </View>
       ) : (
         <View className="gap-3">

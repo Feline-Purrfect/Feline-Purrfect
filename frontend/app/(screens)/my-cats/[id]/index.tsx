@@ -15,6 +15,7 @@ import { formatLongDate, formatMonth, formatShortDay } from '@/lib/dates';
 import { formatAmount, summarizeLog } from '@/lib/logs';
 import { CatPhoto, CatResponse } from '@/types/cat';
 import Feather from '@expo/vector-icons/Feather';
+import { requireAccount } from '@/lib/guest';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
 import { Alert, Pressable, ScrollView, View } from 'react-native';
@@ -47,6 +48,7 @@ export default function CatProfileScreen() {
   const photoTotal = photos.data?.total ?? 0;
 
   const uploadPhoto = async () => {
+    if (!requireAccount('add photos')) return;
     const uri = await pickImage();
     if (uri) addPhoto.mutate({ catId: cat.catId, uri });
   };
@@ -67,7 +69,7 @@ export default function CatProfileScreen() {
               <Text variant="body" className="text-ink-muted">{profileMeta(cat)}</Text>
               {archived && <Text variant="caption">Archived {formatMonth(cat.archivedAt!)}</Text>}
             </View>
-            <Button variant="pillOutline" title="Edit" onPress={() => router.push(`/my-cats/${cat.catId}/edit`)} />
+            <Button variant="pillOutline" title="Edit" onPress={() => requireAccount('edit a cat') && router.push(`/my-cats/${cat.catId}/edit`)} />
           </View>
 
           {/* Tabs */}
@@ -278,6 +280,7 @@ function ArchiveSection({ cat }: { cat: CatResponse }) {
 
   if (!cat.archivedAt) {
     const confirm = () =>
+      requireAccount('archive a cat') &&
       Alert.alert(`Archive ${cat.name}?`, `Logs, photos and reports are kept and reminders stop. You can restore ${cat.name} from Archived cats.`, [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Archive', onPress: () => archive.mutate(cat.catId, { onSuccess: () => router.back() }) },

@@ -50,11 +50,27 @@ export default function LoginScreen() {
       title="Welcome back"
       subtitle="Log in to see your cats and today’s logs."
       footer={
-        <FooterPrompt
-          prompt="New to Feline Purrfect?"
-          action="Create an account"
-          onPress={() => router.push('/signup')}
-        />
+        <View className="gap-2 items-center">
+          <FooterPrompt
+            prompt="New to Feline Purrfect?"
+            action="Create an account"
+            onPress={() => router.push('/signup')}
+          />
+          {/* Opened from the app the header has a back button; opened on its own (e.g. after the
+              session expired) this is the way back to exploring. */}
+          {!router.canGoBack() && (
+            <Pressable
+              onPress={() => router.replace('/(tabs)')}
+              accessibilityRole="link"
+              hitSlop={8}
+              className="py-2"
+            >
+              <Text variant="label" className="text-ink-muted">
+                Look around first
+              </Text>
+            </Pressable>
+          )}
+        </View>
       }
     >
       <View className="gap-[18px]">

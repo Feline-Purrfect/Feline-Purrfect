@@ -1,3 +1,4 @@
+import { demoResponse } from '@/lib/demo';
 import { queryClient } from '@/lib/react-query/queryClient';
 import { session } from '@/lib/session';
 import { SignInResponse } from '@/types/auth';
@@ -9,6 +10,8 @@ export const AUTH_API_URL = process.env.EXPO_PUBLIC_AUTH_API_URL!;
 
 export const AUTH_QUERY_KEY = ['auth', 'user'] as const;
 export const SESSION_EXPIRED = 'SessionExpired';
+/** A guest (no account yet) tried to do something that needs one. */
+export const ACCOUNT_REQUIRED = 'AccountRequired';
 
 /** Every API failure is thrown as this, so screens can rely on `.code` / `.message` / `.status`. */
 export class ApiError extends Error {
@@ -150,6 +153,15 @@ export async function apiFetch<T = any>(path: string, opts: ApiOptions = {}): Pr
       throw new ApiError('NetworkError', 'Unable to reach the server. Check your connection.');
     }
   };
+
+  // Guest mode (nobody has ever signed in on this device, or they signed out): reads are answered with
+  // sample data so the app can be explored, and nothing is written. Screens ask the person to log in
+  // before getting here (lib/guest.ts); this is the safety net.
+  if (auth && !(await session.getAccessToken())) {
+    const sample = method === 'GET' ? demoResponse(path) : undefined;
+    if (sample !== undefined) return sample as T;
+    throw new ApiError(ACCOUNT_REQUIRED, 'Log in or create an account to do this.', 403);
+  }
 
   try {
     let res: Response;

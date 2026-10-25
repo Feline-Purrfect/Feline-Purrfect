@@ -5,6 +5,7 @@ import { cn } from '@/lib/cn';
 import { CatResponse } from '@/types/cat';
 import { LogResponse } from '@/types/log';
 import Feather from '@expo/vector-icons/Feather';
+import { requireAccount } from '@/lib/guest';
 import { router } from 'expo-router';
 import { ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -56,13 +57,15 @@ export function LogStatus({
       key: cat.catId,
       node: (last: boolean) => {
         const log = logFor(cat.catId);
-        const open = () =>
-          log
-            ? router.push(`/logs/${log.id}/edit`)
-            : router.push({
-                pathname: '/logs/[id]/create',
-                params: { id: cat.catId, date: today },
-              });
+        const open = () => {
+          if (!requireAccount('log your cat’s day')) return;
+          if (log) router.push(`/logs/${log.id}/edit`);
+          else
+            router.push({
+              pathname: '/logs/[id]/create',
+              params: { id: cat.catId, date: today },
+            });
+        };
         return (
           <View
             className={cn(
