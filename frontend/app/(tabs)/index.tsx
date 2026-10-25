@@ -1,7 +1,11 @@
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Text } from '@/components/ds';
 import { FoodTrendCard } from '@/components/home/FoodTrendCard';
+import {
+  FoodTrendCardSkeleton,
+  HomeSkeleton,
+  LogStatusSkeleton,
+} from '@/components/home/HomeSkeleton';
 import { LogStatus } from '@/components/home/LogStatus';
 import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
@@ -15,7 +19,6 @@ import Feather from '@expo/vector-icons/Feather';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -58,7 +61,6 @@ export default function HomeScreen() {
     [catList, logList, today],
   );
 
-  if (cats.isLoading) return <LoadingIndicator />;
   if (cats.error && !cats.data) {
     return (
       <ErrorView
@@ -127,7 +129,9 @@ export default function HomeScreen() {
         </Pressable>
       </View>
 
-      {catList.length === 0 ? (
+      {cats.isLoading ? (
+        <HomeSkeleton screenWidth={screenW} />
+      ) : catList.length === 0 ? (
         <View className="mx-5 bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
           <Text variant="card" className="text-center">
             Welcome to Feline Purrfect
@@ -145,10 +149,7 @@ export default function HomeScreen() {
       ) : (
         <>
           {logs.isLoading ? (
-            <ActivityIndicator
-              color={Colors.primary.DEFAULT}
-              className="py-10"
-            />
+            <LogStatusSkeleton rows={catList.length} />
           ) : logs.error && !logs.data ? (
             <Text variant="body" className="px-5 text-danger">
               {(logs.error as any)?.message ?? 'Couldn’t load today’s logs.'}{' '}
@@ -235,21 +236,25 @@ export default function HomeScreen() {
                   ),
                 )
               }
-              renderItem={({ item }) => (
-                <FoodTrendCard
-                  cat={item}
-                  week={
-                    weeks.get(item.catId) ?? foodWeek([], item.catId, today)
-                  }
-                  width={cardW}
-                  onPress={() =>
-                    router.push({
-                      pathname: '/dashboard/analytics',
-                      params: { catId: item.catId },
-                    })
-                  }
-                />
-              )}
+              renderItem={({ item }) =>
+                logs.isLoading ? (
+                  <FoodTrendCardSkeleton width={cardW} />
+                ) : (
+                  <FoodTrendCard
+                    cat={item}
+                    week={
+                      weeks.get(item.catId) ?? foodWeek([], item.catId, today)
+                    }
+                    width={cardW}
+                    onPress={() =>
+                      router.push({
+                        pathname: '/dashboard/analytics',
+                        params: { catId: item.catId },
+                      })
+                    }
+                  />
+                )
+              }
             />
 
             {catList.length > 1 &&

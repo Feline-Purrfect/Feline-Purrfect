@@ -1,7 +1,7 @@
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Text } from '@/components/ds';
 import { FullLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
+import { LogDetailSkeleton } from '@/components/logs/LogSkeletons';
 import { useCat } from '@/hooks/useCats';
 import { useLog } from '@/hooks/useLogs';
 import { formatLongDate, todayYmd } from '@/lib/dates';
@@ -16,7 +16,7 @@ export default function LogDetailScreen() {
   const { data: log, isLoading, error, refetch } = useLog(id);
   const { data: cat } = useCat(log?.catId ?? '');
 
-  if (isLoading || (log && !cat)) return <LoadingIndicator />;
+  if (isLoading || (log && !cat)) return <LogDetailSkeleton bottomInset={insets.bottom} />;
   if (!log || !cat) return <ErrorView message={(error as any)?.message ?? 'This log couldn’t be found.'} onRetry={() => refetch()} />;
 
   return (

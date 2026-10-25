@@ -1,8 +1,8 @@
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Text } from '@/components/ds';
 import { CalendarSheet } from '@/components/logs/CalendarSheet';
 import { CompactLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
+import { LogCardsSkeleton } from '@/components/logs/LogSkeletons';
 import { WeekStrip } from '@/components/logs/WeekStrip';
 import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
@@ -12,7 +12,7 @@ import { addDays, dayStatus } from '@/lib/logs';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
@@ -50,7 +50,6 @@ export default function LogsScreen() {
   const cats = useCats();
   const week = useLogsRange(days[0], days[6]);
 
-  if (cats.isLoading) return <LoadingIndicator />;
   if (cats.error && !cats.data) return <ErrorView message={(cats.error as any)?.message} onRetry={() => cats.refetch()} />;
 
   const catList = cats.data ?? [];
@@ -86,7 +85,9 @@ export default function LogsScreen() {
           {isToday ? `Today · ${LONG.format(fromYmd(selected))}` : LONG.format(fromYmd(selected))}
         </Text>
 
-        {catList.length === 0 ? (
+        {cats.isLoading ? (
+          <LogCardsSkeleton />
+        ) : catList.length === 0 ? (
           <View className="bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
             <Text variant="card" className="text-center">No cats to log yet</Text>
             <Text variant="caption" className="text-center text-body">Add a cat first, then log their food, water and litter here each day.</Text>
@@ -94,7 +95,7 @@ export default function LogsScreen() {
           </View>
         ) : week.isLoading || week.isPlaceholderData ? (
           // isPlaceholderData: the strip moved and the new days are still loading
-          <ActivityIndicator color={Colors.primary.DEFAULT} className="py-10" />
+          <LogCardsSkeleton cards={catList.length} />
         ) : week.error ? (
           <Text variant="body" className="text-danger">{(week.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to try again.</Text>
         ) : (

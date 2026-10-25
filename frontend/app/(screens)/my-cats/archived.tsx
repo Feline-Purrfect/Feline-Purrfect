@@ -1,6 +1,6 @@
 import { CatAvatar } from '@/components/cats/CatAvatar';
+import { CatListSkeleton } from '@/components/cats/CatSkeletons';
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Card, Divider, Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
 import { useArchivedCats } from '@/hooks/useCats';
@@ -15,7 +15,6 @@ export default function ArchivedCatsScreen() {
   const insets = useSafeAreaInsets();
   const { data: cats = [], isLoading, error, refetch } = useArchivedCats();
 
-  if (isLoading) return <LoadingIndicator />;
   if (error)
     return (
       <ErrorView
@@ -39,7 +38,9 @@ export default function ArchivedCatsScreen() {
         delete it.
       </Text>
 
-      {cats.length === 0 ? (
+      {isLoading ? (
+        <CatListSkeleton />
+      ) : cats.length === 0 ? (
         <Text variant="body" className="text-ink-muted">
           No archived cats.
         </Text>

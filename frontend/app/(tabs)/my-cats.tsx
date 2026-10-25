@@ -1,6 +1,6 @@
 import { CatGridCard } from '@/components/cats/CatGridCard';
+import { CatGridSkeleton } from '@/components/cats/CatSkeletons';
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, SectionHeader, Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
 import { useArchivedCats, useCats, useRecentPhotos } from '@/hooks/useCats';
@@ -28,7 +28,6 @@ export default function MyCatsScreen() {
   const refreshing = cats.isRefetching || archived.isRefetching || recent.isRefetching;
   const refresh = () => Promise.all([cats.refetch(), archived.refetch(), recent.refetch()]);
 
-  if (cats.isLoading) return <LoadingIndicator />;
   if (cats.error && !cats.data) {
     return <ErrorView message={(cats.error as any)?.message ?? 'Couldn’t load your cats.'} onRetry={() => cats.refetch()} />;
   }
@@ -55,7 +54,9 @@ export default function MyCatsScreen() {
         )}
       </View>
 
-      {list.length === 0 ? (
+      {cats.isLoading ? (
+        <CatGridSkeleton />
+      ) : list.length === 0 ? (
         <View className="bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
           <Text variant="card" className="text-center">Add your first cat</Text>
           <Text variant="caption" className="text-center text-body">
