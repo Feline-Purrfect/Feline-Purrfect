@@ -13,6 +13,9 @@ export const catKeys = {
   photosOn: (catId: string, date: string) =>
     ['cats', 'photos', catId, date] as const,
   recentPhotos: ['cats', 'photos', 'recent'] as const,
+  photoRanges: ['cats', 'photos', 'range'] as const,
+  photoRange: (from: string, to: string) =>
+    ['cats', 'photos', 'range', from, to] as const,
 };
 
 const DASHBOARD_KEY = ['dashboard', 'analytics'];
@@ -66,8 +69,21 @@ export function useCatPhotos(catId: string) {
   });
 }
 
-/** One cat's photos from one day (shown on that day's log). */
-export function useCatPhotosOn(catId: string, date: string) {
+/** Every cat's photos between two dates (the Logs tab's week), in one request. */
+export function usePhotosInRange(from: string, to: string) {
+  return useQuery({
+    queryKey: catKeys.photoRange(from, to),
+    queryFn: () => catsApi.getPhotosInRange(from, to),
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** One cat's photos from one day (shown on that day's log). Pass `enabled: false` when a parent already has them. */
+export function useCatPhotosOn(
+  catId: string,
+  date: string,
+  { enabled = true }: { enabled?: boolean } = {},
+) {
   return useQuery({
     queryKey: catKeys.photosOn(catId, date),
     // Filter here too: a backend without the ?on= filter returns every photo, which made old photos
@@ -76,7 +92,7 @@ export function useCatPhotosOn(catId: string, date: string) {
       (
         await catsApi.getCatPhotos(catId, { on: date, limit: 12 })
       ).photos.filter((p) => p.takenOn === date),
-    enabled: !!catId && !!date,
+    enabled: enabled && !!catId && !!date,
   });
 }
 
@@ -156,6 +172,7 @@ export function useAddCatPhoto() {
     onSuccess: (photo) => {
       queryClient.invalidateQueries({ queryKey: catKeys.photos(photo.catId) });
       queryClient.invalidateQueries({ queryKey: catKeys.recentPhotos });
+      queryClient.invalidateQueries({ queryKey: catKeys.photoRanges });
     },
     onError: showError('Couldn’t upload that photo'),
   });
@@ -168,6 +185,7 @@ export function useDeleteCatPhoto() {
     onSuccess: (_, { catId }) => {
       queryClient.invalidateQueries({ queryKey: catKeys.photos(catId) });
       queryClient.invalidateQueries({ queryKey: catKeys.recentPhotos });
+      queryClient.invalidateQueries({ queryKey: catKeys.photoRanges });
     },
     onError: showError('Couldn’t delete that photo'),
   });

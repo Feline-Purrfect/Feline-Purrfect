@@ -1,15 +1,28 @@
 import { admin } from '../lib/supabase.js';
 import { HttpError } from '../lib/errors.js';
 
-// Tiny in-memory cache so a burst of parallel app requests costs one Supabase round-trip,
-// not one each. Short TTL keeps revoked/deleted users from lingering.
-const TTL_MS = 30_000;
+// In-memory cache so the app's requests cost one Supabase Auth round-trip per token every few
+// minutes, not one each. Sign-out, account deletion and profile/consent changes call forgetUser(),
+// so the TTL only bounds how long a token revoked some other way (e.g. from the Supabase dashboard)
+// keeps working.
+const TTL_MS = 5 * 60_000;
 const MAX_ENTRIES = 2000;
 const cache = new Map();
 
+/** The token's own expiry (ms), read from its payload. Only called after Supabase validated it. */
+function tokenExpiry(token) {
+  try {
+    const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64url').toString('utf8'));
+    return typeof payload.exp === 'number' ? payload.exp * 1000 : Infinity;
+  } catch {
+    return Infinity;
+  }
+}
+
 function remember(token, user) {
   if (cache.size >= MAX_ENTRIES) cache.delete(cache.keys().next().value);
-  cache.set(token, { user, expires: Date.now() + TTL_MS });
+  // Never trust a cached token past its own expiry.
+  cache.set(token, { user, expires: Math.min(Date.now() + TTL_MS, tokenExpiry(token)) });
 }
 
 function forgetUser(userId) {

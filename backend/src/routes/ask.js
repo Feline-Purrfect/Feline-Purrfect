@@ -190,10 +190,11 @@ router.get('/threads', async (req, res) => {
 
 router.get('/threads/:threadId', async (req, res) => {
   const thread = await ownedThread(req.user.id, req.params.threadId);
-  const { data, error } = await admin.from('ask_messages').select('*')
-    .eq('thread_id', thread.thread_id).order('created_at', { ascending: true });
+  const [{ data, error }, names] = await Promise.all([
+    admin.from('ask_messages').select('*').eq('thread_id', thread.thread_id).order('created_at', { ascending: true }),
+    catNames(req.user.id, [thread.cat_id]),
+  ]);
   if (error) throw error;
-  const names = await catNames(req.user.id, [thread.cat_id]);
   res.json({ thread: toThread(thread, names.get(thread.cat_id)), messages: (data ?? []).map(toMessage) });
 });
 
@@ -217,15 +218,22 @@ router.post('/', async (req, res) => {
   if (!claude.available) throw new HttpError(503, 'AskUnavailable', 'Ask is not available right now.');
   assertConsent(req.user);
 
-  const used = await usedToday(req.user.id);
+  // Independent lookups run together: the quota and the chat being continued…
+  const [used, thread] = await Promise.all([
+    usedToday(req.user.id),
+    body.threadId ? ownedThread(req.user.id, body.threadId) : null,
+  ]);
   if (used >= config.ask.dailyLimit) {
     throw new HttpError(429, 'AskLimitReached', `You’ve reached today’s limit of ${config.ask.dailyLimit} questions. Try again tomorrow.`);
   }
 
   // A continued chat keeps its subject; a new one takes it from catId.
-  const thread = body.threadId ? await ownedThread(req.user.id, body.threadId) : null;
   const catId = thread ? thread.cat_id : (body.catId || null);
-  const cat = catId ? await ownedCat(req.user.id, catId) : null;
+  // …then the cat and the chat history.
+  const [cat, history] = await Promise.all([
+    catId ? ownedCat(req.user.id, catId) : null,
+    thread ? recentMessages(thread.thread_id) : [],
+  ]);
 
   const serverToday = new Date().toISOString().slice(0, 10);
   // Accept the phone's date only within a day of the server's (time zones), never an arbitrary one.
@@ -234,7 +242,6 @@ router.post('/', async (req, res) => {
     : serverToday;
 
   const emergency = looksLikeEmergency(body.message);
-  const history = thread ? await recentMessages(thread.thread_id) : [];
 
   let context = null;
   const messages = [...history];

@@ -87,6 +87,7 @@ async function logSummaries(userId, catIds) {
     .from('logs')
     .select('cat_id,log_date,symptoms,appetite,energy')
     .eq('user_id', userId)
+    .in('cat_id', catIds) // one cat when presenting a single cat, not every cat's two weeks
     .gte('log_date', since)
     .order('log_date', { ascending: false });
   if (error) throw error;
@@ -195,6 +196,25 @@ router.get('/photos/recent', async (req, res) => {
   res.json({ photos: data.map((p) => toPhoto(p, urls.get(p.path), names.get(p.cat_id))) });
 });
 
+// Every photo of the user's cats taken between two dates (inclusive), e.g. the week the Logs tab shows.
+// One request for all the day cards instead of one per cat per day.
+const photoRangeSchema = z.object({
+  from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'from must be YYYY-MM-DD'),
+  to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'to must be YYYY-MM-DD'),
+}).refine((r) => r.from <= r.to, 'from must be before to')
+  .refine((r) => Date.parse(r.to) - Date.parse(r.from) <= 62 * 86_400_000, 'Ask for at most two months at a time');
+
+router.get('/photos', async (req, res) => {
+  const range = parse(photoRangeSchema, { from: req.query.from, to: req.query.to });
+  const { data, error } = await admin.from('cat_photos').select('*')
+    .eq('user_id', req.user.id).gte('taken_on', range.from).lte('taken_on', range.to)
+    .order('taken_on', { ascending: false }).order('created_at', { ascending: false })
+    .limit(500);
+  if (error) throw error;
+  const urls = await signPhotoPaths(data.map((p) => p.path));
+  res.json({ photos: data.map((p) => toPhoto(p, urls.get(p.path))) });
+});
+
 router.get('/:id', async (req, res) => {
   const row = await findOwnedCat(req.user.id, req.params.id);
   res.json({ cat: await presentOne(row, req.user.id) });
@@ -202,6 +222,7 @@ router.get('/:id', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const existing = await findOwnedCat(req.user.id, req.params.id);
+  const previousPhotoPath = existing.photo_path;
   const body = parse(updateSchema, req.body);
 
   const patch = {};
@@ -236,7 +257,12 @@ router.put('/:id', async (req, res) => {
   }
 
   const { data, error } = await admin.from('cats').update(patch).eq('cat_id', existing.cat_id).eq('user_id', req.user.id).select().single();
-  if (error) throw error;
+  if (error) {
+    if (patch.photo_path) await deletePhotos([patch.photo_path]);
+    throw error;
+  }
+  // Each upload has its own path; the old file is no longer referenced.
+  if (patch.photo_path && previousPhotoPath && previousPhotoPath !== patch.photo_path) await deletePhotos([previousPhotoPath]);
   res.json({ message: 'Changes saved', cat: await presentOne(data, req.user.id) });
 });
 
@@ -275,18 +301,20 @@ const photoSchema = z.object({
 });
 
 router.get('/:id/photos', async (req, res) => {
-  const cat = await findOwnedCat(req.user.id, req.params.id);
+  if (!isUuid(req.params.id)) throw notFound('Cat');
   const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 60, 1), 200);
   const offset = Math.max(parseInt(req.query.offset, 10) || 0, 0);
 
   // ?on=YYYY-MM-DD → only photos from that day (shown on that day's log)
   const on = typeof req.query.on === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(req.query.on) ? req.query.on : null;
 
-  let q = admin.from('cat_photos').select('*', { count: 'exact' }).eq('cat_id', cat.cat_id).eq('user_id', req.user.id);
+  // The ownership check and the photo query run together (both filter by the user anyway).
+  let q = admin.from('cat_photos').select('*', { count: 'exact' }).eq('cat_id', req.params.id).eq('user_id', req.user.id);
   if (on) q = q.eq('taken_on', on);
-  const { data, error, count } = await q
-    .order('taken_on', { ascending: false }).order('created_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+  const [, { data, error, count }] = await Promise.all([
+    findOwnedCat(req.user.id, req.params.id),
+    q.order('taken_on', { ascending: false }).order('created_at', { ascending: false }).range(offset, offset + limit - 1),
+  ]);
   if (error) throw error;
 
   const urls = await signPhotoPaths(data.map((p) => p.path));

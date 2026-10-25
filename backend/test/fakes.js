@@ -77,6 +77,13 @@ function createDb() {
 
   // Postgres functions the API calls through admin.rpc(), re-implemented over the in-memory tables.
   const rpcs = {
+    recent_logs_per_cat({ p_user_id: userId, p_limit: limit }) {
+      const active = tables.cats.filter((c) => c.user_id === userId && c.archived_at == null);
+      return active.flatMap((c) => tables.logs
+        .filter((l) => l.cat_id === c.cat_id)
+        .sort((a, b) => (a.log_date < b.log_date ? 1 : -1))
+        .slice(0, limit));
+    },
     cats_missing_log_for({ day, user_ids: userIds }) {
       const active = tables.cats.filter((c) => c.archived_at == null && userIds.includes(c.user_id));
       const total = (uid) => active.filter((c) => c.user_id === uid).length;
@@ -84,11 +91,16 @@ function createDb() {
       return active.filter((c) => !finished(c)).map((c) => ({ user_id: c.user_id, cat_id: c.cat_id, name: c.name, total_cats: total(c.user_id) }));
     },
   };
-  const rpc = async (fn, args) => (rpcs[fn] ? { data: rpcs[fn](args), error: null } : { data: null, error: { message: `fake: no rpc ${fn}` } });
+  // Tests add a name to `missingRpcs` to simulate a migration that hasn't been run (PostgREST PGRST202).
+  const missingRpcs = new Set();
+  const rpc = async (fn, args) => {
+    if (missingRpcs.has(fn) || !rpcs[fn]) return { data: null, error: { code: 'PGRST202', message: `fake: no rpc ${fn}` } };
+    return { data: rpcs[fn](args), error: null };
+  };
 
-  return { tables, from: (t) => new Query(t), rpc };
+  return { tables, from: (t) => new Query(t), rpc, missingRpcs };
 }
 
 export const db = createDb();
 export const authResponses = {}; // test sets e.g. authResponses.signInWithPassword = {data, error}
-export const storageCalls = { uploaded: [], removed: [] };
+export const storageCalls = { uploaded: [], removed: [], signed: [] };

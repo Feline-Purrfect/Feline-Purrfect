@@ -61,15 +61,22 @@ function Stat({ label, value, width = 'w-1/3' }: { label: string; value: string 
  * Logs tab: the day at a glance. Food, water and litter, any symptom (the thing you most need to see),
  * and a quiet line saying what else is in the log. Tap for the full detail.
  */
-export function CompactLogCard({ cat, log, onPress }: { cat: CatResponse; log: LogResponse; onPress: () => void }) {
-  const { data: photos = [] } = useCatPhotosOn(cat.catId, log.date);
+export function CompactLogCard({ cat, log, onPress, photoCount }: {
+  cat: CatResponse;
+  log: LogResponse;
+  onPress: () => void;
+  /** From the Logs tab's one photo request for the week; when given, the card doesn't fetch its own. */
+  photoCount?: number;
+}) {
+  const { data: ownPhotos = [] } = useCatPhotosOn(cat.catId, log.date, { enabled: photoCount === undefined });
+  const photoTotal = photoCount ?? ownPhotos.length;
   const extras = [
     log.medications.length ? (log.medications.length === 1 ? '1 medication' : `${log.medications.length} medications`) : null,
     log.teethBrushed ? 'Teeth brushed' : null,
     log.weight != null ? formatWeight(log.weight, cat.weightUnit) : null,
     log.temperature != null ? `${log.temperature} °C` : null,
     log.notes ? 'Note' : null,
-    photos.length ? (photos.length === 1 ? '1 photo' : `${photos.length} photos`) : null,
+    photoTotal ? (photoTotal === 1 ? '1 photo' : `${photoTotal} photos`) : null,
   ].filter(Boolean);
 
   return (

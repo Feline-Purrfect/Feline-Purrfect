@@ -132,6 +132,20 @@ code that needs them.
 > App Review will open your app cold, so a sleeping backend means a login timeout and a likely rejection.
 > Use a paid instance (Starter) for the production service. The blueprint already does.
 
+## Performance notes
+
+- **Compression:** JSON responses over 1 KB are gzipped (a year of one cat's logs: ~250 KB → ~25 KB).
+- **Auth:** a validated token is cached for 5 minutes (never past its own expiry); sign-out, account deletion
+  and profile/consent changes clear it immediately.
+- **Photo URLs:** signed URLs are cached in memory and reused for 6 of their 7 days. Photo paths are never
+  reused (a changed profile photo gets a new path and the old file is deleted), so a cached URL can't show
+  an outdated picture.
+- **Dashboard:** the newest 30 logs of every cat come from one Postgres function,
+  `recent_logs_per_cat` (`supabase/migrations/007_performance.sql`). Until that migration runs, the API
+  falls back to one query per cat.
+- **Logs tab photos:** `GET /cats/photos?from=&to=` returns every cat's photos for a date range (up to two
+  months) in one call.
+
 ## 4. Monitoring
 
 - **Errors / performance:** create a Sentry project (Node), put its DSN in `SENTRY_DSN`. Unhandled errors and
