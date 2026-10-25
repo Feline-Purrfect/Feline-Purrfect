@@ -1,5 +1,5 @@
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
+import { ThreadListSkeleton } from '@/components/ask/AskSkeletons';
 import { Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
 import { useAskThreads, useDeleteAskThread } from '@/hooks/useAsk';
@@ -74,7 +74,7 @@ export default function AskHistoryScreen() {
       ],
     );
 
-  if (threads.isLoading) return <LoadingIndicator />;
+  if (threads.isLoading) return <ThreadListSkeleton />;
   if (threads.error) return <ErrorView message="Couldn’t load your chats" />;
 
   return (

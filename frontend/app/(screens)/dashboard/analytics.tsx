@@ -1,7 +1,10 @@
+import {
+  AnalyticsBodySkeleton,
+  AnalyticsSkeleton,
+} from '@/components/analytics/AnalyticsSkeleton';
 import { TrendChart } from '@/components/analytics/TrendChart';
 import { CatAvatar } from '@/components/cats/CatAvatar';
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Segmented, Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
 import { useCats } from '@/hooks/useCats';
@@ -29,13 +32,7 @@ import {
   useLocalSearchParams,
 } from 'expo-router';
 import { Fragment, useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  View,
-} from 'react-native';
+import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 
 const RANGES: { value: Range; label: string }[] = [
   { value: 'week', label: 'Week' },
@@ -64,7 +61,7 @@ export default function AnalyticsScreen() {
     return (
       <>
         {header}
-        <LoadingIndicator />
+        <AnalyticsSkeleton />
       </>
     );
   if (cats.error && !cats.data) {
@@ -202,7 +199,7 @@ export default function AnalyticsScreen() {
         />
 
         {logs.isLoading ? (
-          <ActivityIndicator color={Colors.primary.DEFAULT} className="py-16" />
+          <AnalyticsBodySkeleton />
         ) : logs.error && !logs.data ? (
           <Text variant="body" className="text-danger">
             {(logs.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to

@@ -1,4 +1,5 @@
 import { AskComposer } from '@/components/ask/AskComposer';
+import { AskThreadSkeleton } from '@/components/ask/AskSkeletons';
 import {
   AnswerCard,
   ThinkingRow,
@@ -26,7 +27,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ComponentProps, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -310,11 +310,7 @@ export default function AskScreen() {
           <EmptyState cat={subjectCat} onPick={submit} />
         ) : (
           <>
-            {activeThreadId && thread.isLoading && (
-              <View className="py-10 items-center">
-                <ActivityIndicator color={Colors.primary.DEFAULT} />
-              </View>
-            )}
+            {activeThreadId && thread.isLoading && <AskThreadSkeleton />}
             {messages.map((m) =>
               m.role === 'user' ? (
                 <UserBubble key={m.messageId} text={m.content} />

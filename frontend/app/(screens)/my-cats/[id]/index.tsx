@@ -1,8 +1,8 @@
 import { CatAvatar } from '@/components/cats/CatAvatar';
+import { CatProfileSkeleton, PhotoGridSkeleton, RecordsSkeleton } from '@/components/cats/CatSkeletons';
 import { PhotoGrid } from '@/components/cats/PhotoGrid';
 import { PhotoViewer } from '@/components/cats/PhotoViewer';
 import { ErrorView } from '@/components/common/ErrorView';
-import { LoadingIndicator } from '@/components/common/LoadingIndicator';
 import { Button, Card, Divider, SectionHeader, Text } from '@/components/ds';
 import { Colors } from '@/constants/colors';
 import { useArchiveCat, useCat, useCatPhotos, useAddCatPhoto, useDeleteCat, useDeleteCatPhoto, useUnarchiveCat } from '@/hooks/useCats';
@@ -17,7 +17,7 @@ import { CatPhoto, CatResponse } from '@/types/cat';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useLocalSearchParams } from 'expo-router';
 import { Fragment, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, View } from 'react-native';
+import { Alert, Pressable, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 type Tab = 'overview' | 'photos' | 'records';
@@ -39,7 +39,7 @@ export default function CatProfileScreen() {
   const deletePhoto = useDeleteCatPhoto();
   const { pickImage } = useImagePicker({ allowsEditing: false, quality: 0.7 });
 
-  if (isLoading && !cat) return <LoadingIndicator />;
+  if (isLoading && !cat) return <CatProfileSkeleton tabs={TABS} active={tab} bottomInset={insets.bottom} />;
   if (!cat) return <ErrorView message={(error as any)?.message ?? 'This cat couldn’t be found.'} onRetry={() => refetch()} />;
 
   const archived = !!cat.archivedAt;
@@ -97,6 +97,7 @@ export default function CatProfileScreen() {
               onOpenPhotos={() => setTab('photos')}
               onAddPhoto={uploadPhoto}
               uploading={addPhoto.isPending}
+              photosLoading={photos.isLoading}
             />
           )}
 
@@ -115,7 +116,7 @@ export default function CatProfileScreen() {
                 />
               </View>
               {photos.isLoading ? (
-                <ActivityIndicator color={Colors.primary.DEFAULT} className="py-8" />
+                <PhotoGridSkeleton columns={3} rows={2} />
               ) : photoList.length === 0 ? (
                 <Text variant="body" className="text-ink-muted py-6 text-center">No photos yet. Add one to start {cat.name}’s album.</Text>
               ) : (
@@ -141,13 +142,14 @@ export default function CatProfileScreen() {
 }
 
 // ------------------------------------------------------------------ Overview tab
-function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading }: {
+function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading, photosLoading }: {
   cat: CatResponse;
   photos: CatPhoto[];
   photoTotal: number;
   onOpenPhotos: () => void;
   onAddPhoto: () => void;
   uploading: boolean;
+  photosLoading: boolean;
 }) {
   const [showChip, setShowChip] = useState(false);
   const { data: analytics } = useDashboardAnalytics();
@@ -205,7 +207,10 @@ function Overview({ cat, photos, photoTotal, onOpenPhotos, onAddPhoto, uploading
           title="Photos"
           right={photoTotal > 0 ? <Text variant="label" className="font-body text-ink-muted">{photoTotal}</Text> : undefined}
         />
-        {photos.length > 0 ? (
+        {photosLoading ? (
+          // not "Add the first photo" until we know there are none
+          <PhotoGridSkeleton columns={4} />
+        ) : photos.length > 0 ? (
           <PhotoGrid photos={photos} columns={4} max={4} onPress={onOpenPhotos} />
         ) : (
           <Button
@@ -233,7 +238,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 // ------------------------------------------------------------------ Records tab
 function Records({ catId }: { catId: string }) {
   const { data: logs = [], isLoading, error } = useLogs(catId);
-  if (isLoading) return <ActivityIndicator color={Colors.primary.DEFAULT} className="py-8" />;
+  if (isLoading) return <RecordsSkeleton />;
   if (error) return <Text variant="body" className="text-danger">Couldn’t load records. Pull down to try again.</Text>;
   if (logs.length === 0) return <Text variant="body" className="text-ink-muted py-6 text-center">No logs yet.</Text>;
 
