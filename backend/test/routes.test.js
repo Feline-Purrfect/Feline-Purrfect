@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { db, authResponses, storageCalls, load, call, USER_A, USER_B } from './helpers.js';
+import { clearSignedUrlCache } from '../src/services/storage.js';
 import { errorHandler } from '../src/middleware/errorHandler.js';
 
 const cats = await load('cats.js');
@@ -14,6 +15,9 @@ test.beforeEach(() => {
   for (const t of Object.values(db.tables)) t.length = 0;
   storageCalls.uploaded.length = 0;
   storageCalls.removed.length = 0;
+  storageCalls.signed.length = 0;
+  clearSignedUrlCache();
+  db.missingRpcs.clear();
   for (const k of Object.keys(authResponses)) delete authResponses[k];
 });
 
@@ -137,7 +141,7 @@ test('cats: delete removes the profile photo and every gallery photo file', asyn
   await call(cats, 'POST', '/:id/photos', { params: { id: catId }, body: { photo: PNG } });
   assert.equal((await call(cats, 'DELETE', '/:id', { params: { id: catId } })).status, 200);
   assert.equal(db.tables.cats.length, 0);
-  assert.ok(storageCalls.removed.includes(`${USER_A}/${catId}/profile`));
+  assert.ok(storageCalls.removed.some((p) => p.startsWith(`${USER_A}/${catId}/profile`)));
   assert.ok(storageCalls.removed.some((p) => p.startsWith(`${USER_A}/${catId}/photos/`)));
 });
 
@@ -450,4 +454,60 @@ test('unexpected errors become a clean 500 with no internals leaked', async () =
   errorHandler(new Error('connection string postgres://secret'), { log: { error() {} } }, res, () => {});
   assert.equal(out.status, 500);
   assert.equal(out.body.message, 'Internal server error');
+});
+
+// ---------------------------------------------------------------- performance
+test('photos: one request returns every cat’s photos in a date range', async () => {
+  const mochi = (await call(cats, 'POST', '/', { body: catBody({ name: 'Mochi' }) })).body.cat.catId;
+  const tofu = (await call(cats, 'POST', '/', { body: catBody({ name: 'Tofu' }) })).body.cat.catId;
+  await call(cats, 'POST', '/:id/photos', { params: { id: mochi }, body: { photo: PNG, takenOn: '2026-01-02' } });
+  await call(cats, 'POST', '/:id/photos', { params: { id: tofu }, body: { photo: PNG, takenOn: '2026-01-05' } });
+  await call(cats, 'POST', '/:id/photos', { params: { id: tofu }, body: { photo: PNG, takenOn: '2026-01-20' } });
+
+  const r = await call(cats, 'GET', '/photos', { query: { from: '2026-01-01', to: '2026-01-07' } });
+  assert.equal(r.status, 200);
+  assert.deepEqual(r.body.photos.map((p) => `${p.catId === mochi ? 'Mochi' : 'Tofu'} ${p.takenOn}`), ['Tofu 2026-01-05', 'Mochi 2026-01-02']);
+  assert.ok(r.body.photos.every((p) => p.url));
+
+  assert.equal((await call(cats, 'GET', '/photos', { user: userB, query: { from: '2026-01-01', to: '2026-01-31' } })).body.photos.length, 0);
+  assert.equal((await call(cats, 'GET', '/photos', { query: { from: '2026-01-07', to: '2026-01-01' } })).status, 400);
+  assert.equal((await call(cats, 'GET', '/photos', { query: { from: '2026-01-01', to: '2026-06-01' } })).status, 400);
+});
+
+test('storage: signed URLs are reused instead of re-signed on every request', async () => {
+  await call(cats, 'POST', '/', { body: catBody({ photo: PNG }) });
+  storageCalls.signed.length = 0;
+  const first = (await call(cats, 'GET', '/')).body.cats[0].photoUrl;
+  const second = (await call(cats, 'GET', '/')).body.cats[0].photoUrl;
+  assert.equal(first, second);
+  assert.equal(storageCalls.signed.length, 0); // signed once when the cat was created, cached since
+});
+
+test('cats: changing the photo stores it under a new path and deletes the old file', async () => {
+  const created = (await call(cats, 'POST', '/', { body: catBody({ photo: PNG }) })).body.cat;
+  const oldPath = db.tables.cats[0].photo_path;
+  const updated = (await call(cats, 'PUT', '/:id', { params: { id: created.catId }, body: { photo: PNG } })).body.cat;
+  const newPath = db.tables.cats[0].photo_path;
+  assert.notEqual(newPath, oldPath);
+  assert.notEqual(updated.photoUrl, created.photoUrl); // new URL, so no stale image from any cache
+  assert.ok(storageCalls.removed.includes(oldPath));
+  // an unchanged photo (the app echoes the URL back) keeps the file
+  storageCalls.removed.length = 0;
+  await call(cats, 'PUT', '/:id', { params: { id: created.catId }, body: { photo: updated.photoUrl, name: 'Renamed' } });
+  assert.equal(db.tables.cats[0].photo_path, newPath);
+  assert.equal(storageCalls.removed.length, 0);
+});
+
+test('dashboard: newest 30 logs per cat in one round-trip, with a fallback before migration 007', async () => {
+  const catId = await makeCat();
+  for (let d = 0; d < 35; d += 1) {
+    const logDate = new Date(Date.UTC(2026, 8, 1 + d)).toISOString().slice(0, 10);
+    db.tables.logs.push({ cat_id: catId, user_id: USER_A, log_date: logDate, pee_count: 1, poo_count: 2, symptoms: [], medications: [] });
+  }
+  const viaRpc = (await call(dashboard, 'GET', '/analytics')).body.analysis[0];
+  assert.equal(viaRpc.totalLogs, 30);
+
+  db.missingRpcs.add('recent_logs_per_cat');
+  const viaFallback = (await call(dashboard, 'GET', '/analytics')).body.analysis[0];
+  assert.deepEqual(viaFallback, viaRpc);
 });

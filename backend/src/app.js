@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import helmet from 'helmet';
+import compression from 'compression';
 import cors from 'cors';
 import pinoHttp from 'pino-http';
 import rateLimit from 'express-rate-limit';
@@ -41,6 +42,9 @@ function createApp() {
     },
   }));
   app.use(helmet());
+  // gzip JSON responses: a year of one cat's logs is ~250 KB raw and ~25 KB compressed, which is most
+  // of the wait on a phone connection. Bodies under 1 KB are sent as is.
+  app.use(compression({ threshold: 1024 }));
   app.use(cors({
     origin: config.corsOrigins.length ? config.corsOrigins : true,
     allowedHeaders: ['Content-Type', 'Authorization'],

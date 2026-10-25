@@ -170,13 +170,15 @@ router.get('/', async (req, res) => {
   });
 
   let query = admin.from('logs').select('*').eq('user_id', req.user.id);
-  if (catId) {
-    await assertOwnsCat(req.user.id, String(catId));
-    query = query.eq('cat_id', String(catId));
-  }
+  if (catId) query = query.eq('cat_id', String(catId));
   if (range.from) query = query.gte('log_date', range.from);
   if (range.to) query = query.lte('log_date', range.to);
-  const { data, error } = await query.order('log_date', { ascending: false }).limit(limit);
+  // The query is already limited to the caller's rows, so the ownership check (for a clean 404) can
+  // run alongside it instead of before it.
+  const [, { data, error }] = await Promise.all([
+    catId ? assertOwnsCat(req.user.id, String(catId)) : null,
+    query.order('log_date', { ascending: false }).limit(limit),
+  ]);
   if (error) throw error;
   res.json({ logs: data.map(toLog) });
 });

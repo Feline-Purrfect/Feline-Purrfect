@@ -32,7 +32,7 @@ export const admin = {
   auth: adminAuth,
   storage: {
     from: () => ({
-      createSignedUrls: async (paths) => ({ data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}` })), error: null }),
+      createSignedUrls: async (paths) => { storageCalls.signed.push(...paths); return { data: paths.map((path) => ({ path, signedUrl: `https://signed/${path}` })), error: null }; },
       remove: async (paths) => { storageCalls.removed.push(...paths); return { error: null }; },
       upload: async (path) => { storageCalls.uploaded.push(path); return { error: null }; },
     }),

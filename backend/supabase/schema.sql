@@ -161,6 +161,23 @@ drop trigger if exists notification_settings_set_updated_at on public.notificati
 create trigger notification_settings_set_updated_at before update on public.notification_settings
   for each row execute function public.set_updated_at();
 
+-- ---------------------------------------------------------------- dashboard (newest logs per cat in one round-trip)
+create or replace function public.recent_logs_per_cat(p_user_id uuid, p_limit integer default 30)
+returns setof public.logs
+language sql stable security definer set search_path = public as $$
+  select l.*
+  from public.cats c
+  cross join lateral (
+    select * from public.logs
+    where logs.cat_id = c.cat_id
+    order by logs.log_date desc
+    limit greatest(1, least(p_limit, 400))
+  ) l
+  where c.user_id = p_user_id and c.archived_at is null;
+$$;
+revoke all on function public.recent_logs_per_cat(uuid, integer) from public, anon, authenticated;
+grant execute on function public.recent_logs_per_cat(uuid, integer) to service_role;
+
 -- ---------------------------------------------------------------- reminder query (used by the cron job)
 create or replace function public.cats_missing_log_for(day date, user_ids uuid[])
 returns table (user_id uuid, cat_id uuid, name text, total_cats integer)
