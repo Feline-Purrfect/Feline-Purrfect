@@ -4,6 +4,8 @@ import { admin } from '../lib/supabase.js';
 import { HttpError, parse } from '../lib/errors.js';
 import { requireAuth } from '../middleware/auth.js';
 import { isValidToken } from '../services/push.js';
+import { isValidTimeZone } from '../lib/reminderTime.js';
+import { saveSettings } from '../services/reminders.js';
 
 const router = express.Router();
 router.use(requireAuth);
@@ -11,6 +13,9 @@ router.use(requireAuth);
 const schema = z.object({
   token: z.string({ required_error: 'Token is required' }).min(1),
   platform: z.enum(['ios', 'android']).optional(),
+  // The phone's IANA time zone, so the daily reminder fires at the chosen local time. Sent on every
+  // registration (each app start), which also follows the user when they travel.
+  timezone: z.string().refine(isValidTimeZone, { message: 'Unknown time zone' }).optional(),
 });
 
 // Register (or re-assign, if the phone changed hands) an Expo push token.
@@ -23,6 +28,9 @@ router.post('/', async (req, res) => {
     { onConflict: 'token' },
   );
   if (error) throw error;
+
+  // First device creates the reminder settings (on, 23:00); later calls only keep the time zone current.
+  await saveSettings(req.user.id, body.timezone ? { timezone: body.timezone } : {});
   res.status(201).json({ message: 'Device registered' });
 });
 

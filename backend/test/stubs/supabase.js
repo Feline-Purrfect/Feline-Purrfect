@@ -28,6 +28,7 @@ const adminAuth = {
 
 export const admin = {
   from: db.from,
+  rpc: db.rpc,
   auth: adminAuth,
   storage: {
     from: () => ({

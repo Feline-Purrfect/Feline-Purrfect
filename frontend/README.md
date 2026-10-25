@@ -25,6 +25,19 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Push notifications (daily log reminder)
+
+The server sends the reminder through the Expo Push Service; the app registers this phone's push token.
+
+1. Link the project to EAS once: `npx eas init` (adds `extra.eas.projectId` to `app.json`; push tokens need it).
+2. Test on a **development build** on a real device (`npx expo run:ios --device` / `npx expo run:android`).
+   Expo Go on Android can't receive push notifications.
+3. For production: iOS needs an APNs key and Android an FCM V1 service-account key, both uploaded with
+   `eas credentials`.
+
+The app offers reminders once, the first time the user has a cat; Settings → Notifications turns them
+on or off and sets the time (default 11:00 PM).
+
 ## Get a fresh project
 
 When you're ready, run:

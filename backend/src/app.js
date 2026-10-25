@@ -16,6 +16,7 @@ import catsRoutes from './routes/cats.js';
 import logsRoutes from './routes/logs.js';
 import dashboardRoutes from './routes/dashboard.js';
 import devicesRoutes from './routes/devices.js';
+import notificationsRoutes from './routes/notifications.js';
 import askRoutes from './routes/ask.js';
 import legalRoutes from './routes/legal.js';
 
@@ -76,6 +77,7 @@ function createApp() {
   app.use('/logs', jsonSmall, logsRoutes);
   app.use('/dashboard', dashboardRoutes);
   app.use('/devices', jsonSmall, devicesRoutes);
+  app.use('/notifications', jsonSmall, notificationsRoutes);
   app.use('/ask', askLimiter, jsonSmall, askRoutes);
 
   // Sentry smoke test (dev only). Must be registered before the 404 handler or it is unreachable.

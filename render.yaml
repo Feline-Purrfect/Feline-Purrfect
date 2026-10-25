@@ -7,24 +7,24 @@ services:
   - type: web
     name: feline-purrfect-api
     runtime: node
-    region: virginia            # closest to your old us-east-1; keep Supabase in us-east-1 too
-    plan: starter               # free instances sleep after 15 min idle — see README before using free for the App Store
+    region: virginia # closest to your old us-east-1; keep Supabase in us-east-1 too
+    plan: starter # free instances sleep after 15 min idle — see README before using free for the App Store
     branch: main
-    rootDir: backend            # the Node app lives in backend/; commands run there
-    buildFilter:                # paths are relative to the repo root
+    rootDir: backend # the Node app lives in backend/; commands run there
+    buildFilter: # paths are relative to the repo root
       paths:
         - backend/**
       ignoredPaths:
         - backend/test/**
         - backend/**/*.md
         - backend/.env.example
-    autoDeployTrigger: checksPass  # deploy only after CI passes on the commit
+    autoDeployTrigger: checksPass # deploy only after CI passes on the commit
     buildCommand: npm ci --omit=dev
     startCommand: npm start
     healthCheckPath: /health
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: NODE_ENV
         value: production
       - key: SUPABASE_URL
@@ -38,9 +38,9 @@ services:
       - key: SENTRY_DSN
         sync: false
       - key: SENTRY_TRACES_SAMPLE_RATE
-        value: "0.1"
+        value: '0.1'
       - key: CORS_ORIGINS
-        value: ""
+        value: ''
       - key: NOTIFICATION_TESTER_IDS
         sync: false
       - key: ANTHROPIC_API_KEY
@@ -48,7 +48,7 @@ services:
       - key: ASK_MODEL
         value: claude-haiku-5-5
       - key: ASK_DAILY_LIMIT
-        value: "30"
+        value: '30'
       - key: LEGAL_OPERATOR_NAME
         sync: false
       - key: LEGAL_CONTACT_EMAIL
@@ -59,22 +59,22 @@ services:
     runtime: node
     region: virginia
     plan: starter
-    schedule: "*/5 * * * *"     # every 5 min: each user's reminder goes out at their own time (default 23:00 local), once a day
+    schedule: '*/5 * * * *' # every 5 min: each user's reminder goes out at their own time (default 23:00 local), once a day
     branch: main
-    rootDir: backend            # the Node app lives in backend/; commands run there
-    buildFilter:                # paths are relative to the repo root
+    rootDir: backend # the Node app lives in backend/; commands run there
+    buildFilter: # paths are relative to the repo root
       paths:
         - backend/**
       ignoredPaths:
         - backend/test/**
         - backend/**/*.md
         - backend/.env.example
-    autoDeployTrigger: checksPass  # deploy only after CI passes on the commit
+    autoDeployTrigger: checksPass # deploy only after CI passes on the commit
     buildCommand: npm ci --omit=dev
     startCommand: npm run job:check-missing-logs
     envVars:
       - key: NODE_VERSION
-        value: "22"
+        value: '22'
       - key: NODE_ENV
         value: production
       - key: SUPABASE_URL

@@ -8,7 +8,8 @@
     "scheme": "felinepurrfect",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.jh.ember.felinepurrfect"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "output": "static",
@@ -53,6 +57,13 @@
       "@sentry/react-native",
       "expo-font",
       "expo-image",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#3A5BA6"
+        }
+      ],
       "expo-secure-store",
       "expo-status-bar",
       "expo-web-browser"
@@ -60,6 +71,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3d048e92-02e0-4d17-998b-60b6d5dd4aca"
+      }
+    },
+    "owner": "jh.ember"
   }
 }

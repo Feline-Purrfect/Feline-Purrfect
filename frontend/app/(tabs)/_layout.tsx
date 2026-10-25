@@ -1,6 +1,7 @@
 import { AuthGuard } from '@/components/common/AuthGuard';
 import { Colors } from '@/constants/colors';
 import { Fonts } from '@/constants/theme';
+import { useReminderSetup, useReminderTapHandler } from '@/hooks/useNotifications';
 import {
   Ionicons as AskIcon,
   Entypo as HomeIcon,
@@ -12,6 +13,7 @@ import { Tabs } from 'expo-router';
 export default function TabLayout() {
   return (
     <AuthGuard>
+      <Reminders />
       <Tabs
         screenOptions={{
           tabBarActiveTintColor: Colors.primary.DEFAULT,
@@ -83,4 +85,11 @@ export default function TabLayout() {
       </Tabs>
     </AuthGuard>
   );
+}
+
+/** Signed-in only (inside AuthGuard): push registration, the one-time offer, and reminder taps. */
+function Reminders() {
+  useReminderSetup();
+  useReminderTapHandler();
+  return null;
 }
