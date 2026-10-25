@@ -8,14 +8,15 @@ import {
 } from '@/components/home/HomeSkeleton';
 import { LogStatus } from '@/components/home/LogStatus';
 import { Colors } from '@/constants/colors';
-import { useCats } from '@/hooks/useCats';
+import { catKeys, useCats } from '@/hooks/useCats';
 import { useDashboardAnalytics } from '@/hooks/useDashboard';
-import { useLogsRange } from '@/hooks/useLogs';
+import { logKeys, useLogsRange } from '@/hooks/useLogs';
 import { cn } from '@/lib/cn';
 import { todayYmd } from '@/lib/dates';
 import { foodWeek } from '@/lib/insights';
 import { addDays } from '@/lib/logs';
 import Feather from '@expo/vector-icons/Feather';
+import { useQueryClient } from '@tanstack/react-query';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useMemo, useState } from 'react';
 import {
@@ -33,6 +34,7 @@ const DOTS_MAX = 5; // more cats than this → "2 / 10" instead of dots
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const { width: screenW } = useWindowDimensions();
   const [today, setToday] = useState(todayYmd);
   const [page, setPage] = useState(0);
@@ -42,15 +44,20 @@ export default function HomeScreen() {
   const logs = useLogsRange(addDays(today, -13), today);
   const analytics = useDashboardAnalytics();
 
-  // Refresh when coming back to Home (e.g. after saving a log), and pick up a new day after midnight.
+  // Pick up a new day after midnight when coming back to Home. Saving a log, cat or photo already
+  // invalidates these queries (they refetch on their own), so only data older than its staleTime is
+  // refetched here, instead of three requests every time the tab is shown.
   useFocusEffect(
     useCallback(() => {
       setToday(todayYmd());
-      cats.refetch();
-      logs.refetch();
-      analytics.refetch();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []),
+      for (const queryKey of [
+        catKeys.active,
+        logKeys.all,
+        ['dashboard', 'analytics'],
+      ]) {
+        queryClient.refetchQueries({ queryKey, type: 'active', stale: true });
+      }
+    }, [queryClient]),
   );
 
   const catList = useMemo(() => cats.data ?? [], [cats.data]);

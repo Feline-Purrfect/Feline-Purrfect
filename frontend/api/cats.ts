@@ -1,14 +1,13 @@
 import { apiFetch } from '@/lib/api/client';
+import { prepareImageForUpload } from '@/lib/images';
 import { CatPhoto, CatRequest, CatResponse, CatUpdate } from '@/types/cat';
-import { File } from 'expo-file-system';
 
+/** Resized and re-encoded on the phone first (see lib/images.ts): a few hundred KB instead of several MB. */
 async function imageUriToBase64(uri: string): Promise<string> {
   try {
-    const file = new File(uri);
-    const base64 = await file.base64();
-    return `data:image/jpeg;base64,${base64}`;
+    return await prepareImageForUpload(uri);
   } catch (error) {
-    console.error('Failed to convert image to base64:', error);
+    console.error('Failed to prepare image for upload:', error);
     throw new Error('Could not read that photo. Try choosing it again.');
   }
 }
@@ -20,10 +19,13 @@ const photoPayload = async (photo?: string | null) =>
 export const catsApi = {
   /** Active cats by default; `archived: true` for the archive. */
   getCats: async ({ archived = false } = {}): Promise<CatResponse[]> => {
-    const result = await apiFetch<{ cats?: CatResponse[] }>(archived ? '/cats?archived=true' : '/cats', {
-      fallbackCode: 'GetCatsError',
-      fallbackMessage: 'Couldn’t load your cats',
-    });
+    const result = await apiFetch<{ cats?: CatResponse[] }>(
+      archived ? '/cats?archived=true' : '/cats',
+      {
+        fallbackCode: 'GetCatsError',
+        fallbackMessage: 'Couldn’t load your cats',
+      },
+    );
     return result.cats || [];
   },
 
@@ -47,7 +49,11 @@ export const catsApi = {
   },
 
   /** Partial update: only the fields present are changed. */
-  updateCat: async ({ catId, photo, ...rest }: CatUpdate): Promise<CatResponse> => {
+  updateCat: async ({
+    catId,
+    photo,
+    ...rest
+  }: CatUpdate): Promise<CatResponse> => {
     const result = await apiFetch<{ cat: CatResponse }>(`/cats/${catId}`, {
       method: 'PUT',
       body: { ...rest, photo: await photoPayload(photo) },
@@ -58,18 +64,22 @@ export const catsApi = {
   },
 
   archiveCat: async (catId: string): Promise<CatResponse> =>
-    (await apiFetch<{ cat: CatResponse }>(`/cats/${catId}/archive`, {
-      method: 'POST',
-      fallbackCode: 'ArchiveCatError',
-      fallbackMessage: 'Couldn’t archive this cat',
-    })).cat,
+    (
+      await apiFetch<{ cat: CatResponse }>(`/cats/${catId}/archive`, {
+        method: 'POST',
+        fallbackCode: 'ArchiveCatError',
+        fallbackMessage: 'Couldn’t archive this cat',
+      })
+    ).cat,
 
   unarchiveCat: async (catId: string): Promise<CatResponse> =>
-    (await apiFetch<{ cat: CatResponse }>(`/cats/${catId}/unarchive`, {
-      method: 'POST',
-      fallbackCode: 'UnarchiveCatError',
-      fallbackMessage: 'Couldn’t restore this cat',
-    })).cat,
+    (
+      await apiFetch<{ cat: CatResponse }>(`/cats/${catId}/unarchive`, {
+        method: 'POST',
+        fallbackCode: 'UnarchiveCatError',
+        fallbackMessage: 'Couldn’t restore this cat',
+      })
+    ).cat,
 
   /** Permanent: removes the cat, its logs and photos. */
   deleteCat: async (catId: string): Promise<void> => {
@@ -82,27 +92,70 @@ export const catsApi = {
 
   // ------------------------------------------------------------ photo gallery
   /** Newest first. `on` (YYYY-MM-DD) limits to one day, for that day's log. */
-  getCatPhotos: async (catId: string, { limit = 60, offset = 0, on }: { limit?: number; offset?: number; on?: string } = {}): Promise<{ photos: CatPhoto[]; total: number }> =>
-    apiFetch(`/cats/${catId}/photos?limit=${limit}&offset=${offset}${on ? `&on=${on}` : ''}`, {
-      fallbackCode: 'GetPhotosError',
-      fallbackMessage: 'Couldn’t load photos',
-    }),
+  getCatPhotos: async (
+    catId: string,
+    {
+      limit = 60,
+      offset = 0,
+      on,
+    }: { limit?: number; offset?: number; on?: string } = {},
+  ): Promise<{ photos: CatPhoto[]; total: number }> =>
+    apiFetch(
+      `/cats/${catId}/photos?limit=${limit}&offset=${offset}${on ? `&on=${on}` : ''}`,
+      {
+        fallbackCode: 'GetPhotosError',
+        fallbackMessage: 'Couldn’t load photos',
+      },
+    ),
+
+  /** Every cat's photos taken between two dates (inclusive, at most two months): one call for a week of day cards. */
+  getPhotosInRange: async (from: string, to: string): Promise<CatPhoto[]> =>
+    (
+      await apiFetch<{ photos: CatPhoto[] }>(
+        `/cats/photos?from=${from}&to=${to}`,
+        {
+          fallbackCode: 'GetPhotosError',
+          fallbackMessage: 'Couldn’t load photos',
+        },
+      )
+    ).photos,
 
   getRecentPhotos: async (limit = 3): Promise<CatPhoto[]> =>
-    (await apiFetch<{ photos: CatPhoto[] }>(`/cats/photos/recent?limit=${limit}`, {
-      fallbackCode: 'GetPhotosError',
-      fallbackMessage: 'Couldn’t load photos',
-    })).photos,
+    (
+      await apiFetch<{ photos: CatPhoto[] }>(
+        `/cats/photos/recent?limit=${limit}`,
+        {
+          fallbackCode: 'GetPhotosError',
+          fallbackMessage: 'Couldn’t load photos',
+        },
+      )
+    ).photos,
 
-  addCatPhoto: async ({ catId, uri, takenOn }: { catId: string; uri: string; takenOn?: string }): Promise<CatPhoto> =>
-    (await apiFetch<{ photo: CatPhoto }>(`/cats/${catId}/photos`, {
-      method: 'POST',
-      body: { photo: await imageUriToBase64(uri), takenOn },
-      fallbackCode: 'AddPhotoError',
-      fallbackMessage: 'Couldn’t upload that photo',
-    })).photo,
+  addCatPhoto: async ({
+    catId,
+    uri,
+    takenOn,
+  }: {
+    catId: string;
+    uri: string;
+    takenOn?: string;
+  }): Promise<CatPhoto> =>
+    (
+      await apiFetch<{ photo: CatPhoto }>(`/cats/${catId}/photos`, {
+        method: 'POST',
+        body: { photo: await imageUriToBase64(uri), takenOn },
+        fallbackCode: 'AddPhotoError',
+        fallbackMessage: 'Couldn’t upload that photo',
+      })
+    ).photo,
 
-  deleteCatPhoto: async ({ catId, photoId }: { catId: string; photoId: string }): Promise<void> => {
+  deleteCatPhoto: async ({
+    catId,
+    photoId,
+  }: {
+    catId: string;
+    photoId: string;
+  }): Promise<void> => {
     await apiFetch(`/cats/${catId}/photos/${photoId}`, {
       method: 'DELETE',
       fallbackCode: 'DeletePhotoError',

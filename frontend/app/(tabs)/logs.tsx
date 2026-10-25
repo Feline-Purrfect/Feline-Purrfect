@@ -5,17 +5,21 @@ import { CompactLogCard, PendingLogCard } from '@/components/logs/LogDayCard';
 import { LogCardsSkeleton } from '@/components/logs/LogSkeletons';
 import { WeekStrip } from '@/components/logs/WeekStrip';
 import { Colors } from '@/constants/colors';
-import { useCats } from '@/hooks/useCats';
+import { useCats, usePhotosInRange } from '@/hooks/useCats';
 import { useLogsRange } from '@/hooks/useLogs';
 import { fromYmd, todayYmd } from '@/lib/dates';
-import { addDays, dayStatus } from '@/lib/logs';
+import { addDays, alignedRange, dayStatus } from '@/lib/logs';
 import Feather from '@expo/vector-icons/Feather';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const LONG = new Intl.DateTimeFormat('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+const LONG = new Intl.DateTimeFormat('en-US', {
+  weekday: 'long',
+  month: 'long',
+  day: 'numeric',
+});
 const MONTH = new Intl.DateTimeFormat('en-US', { month: 'long' });
 
 export default function LogsScreen() {
@@ -27,42 +31,76 @@ export default function LogsScreen() {
   // /logs?date=YYYY-MM-DD (e.g. from Home) jumps to that day. Handled once per new value, during
   // render rather than in an effect, so the right day shows on the first frame.
   // `at` makes each request unique, so tapping the same link again still jumps back.
-  const { date: dateParam, at } = useLocalSearchParams<{ date?: string; at?: string }>();
+  const { date: dateParam, at } = useLocalSearchParams<{
+    date?: string;
+    at?: string;
+  }>();
   const requestKey = dateParam ? `${dateParam}|${at ?? ''}` : undefined;
-  const [handledParam, setHandledParam] = useState<string | undefined>(undefined);
+  const [handledParam, setHandledParam] = useState<string | undefined>(
+    undefined,
+  );
   if (requestKey !== handledParam) {
     setHandledParam(requestKey);
-    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) && dateParam <= todayYmd()) setSelected(dateParam);
+    if (
+      dateParam &&
+      /^\d{4}-\d{2}-\d{2}$/.test(dateParam) &&
+      dateParam <= todayYmd()
+    )
+      setSelected(dateParam);
   }
 
   // The app can stay open past midnight; re-read "today" whenever the tab is focused.
-  useFocusEffect(useCallback(() => {
-    const t = todayYmd();
-    setToday((prev) => {
-      if (prev !== t) setSelected((s) => (s === prev ? t : s));
-      return t;
-    });
-  }, []));
+  useFocusEffect(
+    useCallback(() => {
+      const t = todayYmd();
+      setToday((prev) => {
+        if (prev !== t) setSelected((s) => (s === prev ? t : s));
+        return t;
+      });
+    }, []),
+  );
 
   // The selected day sits in the middle of the strip (3 days either side).
   const days = Array.from({ length: 7 }, (_, i) => addDays(selected, i - 3));
 
   const cats = useCats();
-  const week = useLogsRange(days[0], days[6]);
+  // Fetched in aligned 14-day blocks: tapping the next day reuses what's loaded instead of a new request.
+  const fetchRange = alignedRange(days[0], days[6]);
+  const week = useLogsRange(fetchRange.from, fetchRange.to);
+  // Every cat's photos for the same range in one request, rather than one per card.
+  const photos = usePhotosInRange(fetchRange.from, fetchRange.to);
 
-  if (cats.error && !cats.data) return <ErrorView message={(cats.error as any)?.message} onRetry={() => cats.refetch()} />;
+  if (cats.error && !cats.data)
+    return (
+      <ErrorView
+        message={(cats.error as any)?.message}
+        onRetry={() => cats.refetch()}
+      />
+    );
 
   const catList = cats.data ?? [];
   const catIds = catList.map((c) => c.catId);
   const logs = week.data ?? [];
   const isToday = selected === today;
   const dayLogs = logs.filter((l) => l.date === selected);
+  // While the week's photos load the count shows 0, so the cards don't each fire their own request; only if
+  // that request fails do the cards fall back to fetching their own (photoCount undefined).
+  const photoCount = (catId: string) =>
+    photos.error && !photos.data
+      ? undefined
+      : photos.isPlaceholderData
+        ? 0
+        : (photos.data ?? []).filter(
+            (p) => p.catId === catId && p.takenOn === selected,
+          ).length;
 
   return (
     <View className="flex-1 bg-canvas">
       <View className="px-5 gap-3.5" style={{ paddingTop: insets.top + 14 }}>
         <View className="flex-row items-center justify-between">
-          <Text variant="title" accessibilityRole="header">Logs</Text>
+          <Text variant="title" accessibilityRole="header">
+            Logs
+          </Text>
           <Pressable
             onPress={() => setCalendarOpen(true)}
             accessibilityRole="button"
@@ -73,41 +111,83 @@ export default function LogsScreen() {
             <Text variant="label">{MONTH.format(fromYmd(selected))}</Text>
           </Pressable>
         </View>
-        <WeekStrip days={days} selected={selected} today={today} onSelect={setSelected} statusFor={(d) => dayStatus(logs, d, catIds).status} />
+        <WeekStrip
+          days={days}
+          selected={selected}
+          today={today}
+          onSelect={setSelected}
+          statusFor={(d) => dayStatus(logs, d, catIds).status}
+        />
       </View>
 
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ padding: 20, gap: 14 }}
-        refreshControl={<RefreshControl refreshing={week.isRefetching} onRefresh={() => week.refetch()} tintColor={Colors.primary.DEFAULT} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={week.isRefetching}
+            onRefresh={() => Promise.all([week.refetch(), photos.refetch()])}
+            tintColor={Colors.primary.DEFAULT}
+          />
+        }
       >
         <Text variant="label" className="text-ink-muted">
-          {isToday ? `Today · ${LONG.format(fromYmd(selected))}` : LONG.format(fromYmd(selected))}
+          {isToday
+            ? `Today · ${LONG.format(fromYmd(selected))}`
+            : LONG.format(fromYmd(selected))}
         </Text>
 
         {cats.isLoading ? (
           <LogCardsSkeleton />
         ) : catList.length === 0 ? (
           <View className="bg-surface border border-line rounded-card px-5 py-8 items-center gap-3">
-            <Text variant="card" className="text-center">No cats to log yet</Text>
-            <Text variant="caption" className="text-center text-body">Add a cat first, then log their food, water and litter here each day.</Text>
-            <Button title="Add cat" onPress={() => router.push('/my-cats/create')} className="self-stretch mt-2" />
+            <Text variant="card" className="text-center">
+              No cats to log yet
+            </Text>
+            <Text variant="caption" className="text-center text-body">
+              Add a cat first, then log their food, water and litter here each
+              day.
+            </Text>
+            <Button
+              title="Add cat"
+              onPress={() => router.push('/my-cats/create')}
+              className="self-stretch mt-2"
+            />
           </View>
         ) : week.isLoading || week.isPlaceholderData ? (
           // isPlaceholderData: the strip moved and the new days are still loading
           <LogCardsSkeleton cards={catList.length} />
         ) : week.error ? (
-          <Text variant="body" className="text-danger">{(week.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to try again.</Text>
+          <Text variant="body" className="text-danger">
+            {(week.error as any)?.message ?? 'Couldn’t load logs.'} Pull down to
+            try again.
+          </Text>
         ) : (
           // Finished logs first, then the ones still to do.
           [...catList]
-            .sort((a, b) => Number(!dayLogs.find((l) => l.catId === a.catId)?.complete) - Number(!dayLogs.find((l) => l.catId === b.catId)?.complete))
+            .sort(
+              (a, b) =>
+                Number(!dayLogs.find((l) => l.catId === a.catId)?.complete) -
+                Number(!dayLogs.find((l) => l.catId === b.catId)?.complete),
+            )
             .map((cat) => {
               const log = dayLogs.find((l) => l.catId === cat.catId) ?? null;
               return log?.complete ? (
-                <CompactLogCard key={cat.catId} cat={cat} log={log} onPress={() => router.push(`/logs/${log.id}`)} />
+                <CompactLogCard
+                  key={cat.catId}
+                  cat={cat}
+                  log={log}
+                  photoCount={photoCount(cat.catId)}
+                  onPress={() => router.push(`/logs/${log.id}`)}
+                />
               ) : (
-                <PendingLogCard key={cat.catId} cat={cat} log={log} date={selected} isToday={isToday} />
+                <PendingLogCard
+                  key={cat.catId}
+                  cat={cat}
+                  log={log}
+                  date={selected}
+                  isToday={isToday}
+                />
               );
             })
         )}
